@@ -1,0 +1,2083 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Montador de Lista M3U</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDF1; --surface:#FFFFFF; --surface-2:#F4F6F8; --line:#D3DAE1;
+  --ink:#15202B; --muted:#5A6977; --accent:#0B6A93; --accent-ink:#FFFFFF; --accent-soft:#DCEDF5;
+  --tally:#C8412B; --warn:#9A6200; --warn-soft:#FBF0DA; --ok:#2F7D4F;
+  --open:#2F6E47; --open-soft:#DDF0E3; --pay:#8A4A12; --pay-soft:#F6E6D6;
+  --code-bg:#0F1A24; --code-ink:#D5E3EE; --code-dim:#6F8799; --code-key:#7CC4E6; --code-grp:#F0B45B;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0E141A; --surface:#161F28; --surface-2:#1C2731; --line:#2A3743;
+    --ink:#E3EAF0; --muted:#8C9BA8; --accent:#4DB2DE; --accent-ink:#06202D; --accent-soft:#16384A;
+    --tally:#F0735D; --warn:#E7B45A; --warn-soft:#3A2C12; --ok:#6CC08C;
+    --open:#7FD19E; --open-soft:#173826; --pay:#F0B27A; --pay-soft:#3D2814;
+    --code-bg:#0A1016; --code-ink:#D5E3EE; --code-dim:#667C8D;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0E141A; --surface:#161F28; --surface-2:#1C2731; --line:#2A3743;
+  --ink:#E3EAF0; --muted:#8C9BA8; --accent:#4DB2DE; --accent-ink:#06202D; --accent-soft:#16384A;
+  --tally:#F0735D; --warn:#E7B45A; --warn-soft:#3A2C12; --ok:#6CC08C;
+  --open:#7FD19E; --open-soft:#173826; --pay:#F0B27A; --pay-soft:#3D2814;
+  --code-bg:#0A1016; --code-ink:#D5E3EE; --code-dim:#667C8D;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.01em;margin:0;text-wrap:balance}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+.brand{display:flex;flex-direction:column;gap:2px}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.tally{width:8px;height:8px;border-radius:50%;background:var(--tally);display:inline-block}
+.brand h1{font-size:40px;line-height:1;text-transform:uppercase}
+.stats{display:flex;gap:18px;font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;align-items:flex-end}
+.stat b{font:600 30px/1 var(--display)}
+.stat span{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.stat.warn b{color:var(--warn)}
+
+/* layout */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.grid > .p-groups{grid-column:1 / -1}
+@media (min-width:1280px){
+  .grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}
+}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.panel-h h2{font-size:22px;text-transform:uppercase;display:flex;align-items:baseline;gap:8px}
+.panel-h h2 small{font:500 13px/1 var(--mono);color:var(--muted);letter-spacing:0}
+.panel-b{padding:16px;display:flex;flex-direction:column;gap:14px}
+.scroll{max-height:min(760px,78vh);overflow:auto}
+
+/* tabs & segmented */
+.tabs{display:flex;gap:4px;background:var(--surface-2);padding:4px;border-radius:6px}
+.tab{flex:1;border:0;background:transparent;padding:7px 10px;border-radius:4px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"],.tab[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+
+/* fields */
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font:500 11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.field label em{font-style:normal;text-transform:none;letter-spacing:0;opacity:.85}
+.in{width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:9px 11px;min-width:0}
+.in:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.in.mono,textarea.in{font-family:var(--mono);font-size:13px}
+textarea.in{resize:vertical;min-height:150px;line-height:1.55}
+select.in{padding:8px 10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:420px){.row2{grid-template-columns:1fr}}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.hint code{font-family:var(--mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+.err{font-size:13px;color:var(--tally);margin:0}
+.err:empty{display:none}
+.suggest{font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:22px}
+
+/* buttons */
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--muted)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--tally)}
+.btn.armed{background:var(--tally);border-color:var(--tally);color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.icon{border:0;background:transparent;padding:4px 7px;border-radius:4px;cursor:pointer;color:var(--muted);font-size:13px;line-height:1}
+.icon:hover{background:var(--surface-2);color:var(--ink)}
+.icon:disabled{opacity:.35;cursor:default}
+.icon.del:hover{color:var(--tally)}
+.icon.armed{background:var(--tally);color:#fff}
+.file-label{display:inline-flex}
+.file-label input{position:absolute;width:1px;height:1px;opacity:0}
+
+/* chips */
+.chip{font:500 11px/1 var(--mono);padding:4px 7px;border-radius:3px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.chip.cat{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.chip.aberta{background:var(--open-soft);color:var(--open);border-color:transparent}
+.chip.fechada{background:var(--pay-soft);color:var(--pay);border-color:transparent}
+.chip.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.chip.grp{background:transparent;color:var(--ink)}
+
+/* inserted cards */
+.inbox{display:flex;flex-direction:column;gap:10px;padding:14px 16px;min-height:140px;transition:background .12s}
+.card{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:7px;background:var(--surface);cursor:grab}
+.card:active{cursor:grabbing}
+.card.dragging,.ch.dragging{opacity:.45}
+.card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.card-name{font-weight:600;overflow-wrap:anywhere}
+.card-url{font:12px/1.4 var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.card-chips{display:flex;flex-wrap:wrap;gap:5px}
+.card-act{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.card-act select{flex:1 1 120px;min-width:0;padding:5px 8px;font-size:13px}
+.grip{color:var(--muted);font:14px/1 var(--mono);letter-spacing:-2px;user-select:none}
+.drop-over{outline:2px dashed var(--accent);outline-offset:-4px;background:var(--accent-soft)}
+.empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:14px}
+
+/* groups */
+.newgroup{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.newgroup .in{flex:1 1 180px;background:var(--surface)}
+.search{flex:1 1 150px;max-width:220px}
+.panel-h .btns{justify-content:flex-end}
+.group{border-bottom:1px solid var(--line);transition:background .12s}
+.group:last-child{border-bottom:0}
+.g-head{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface-2);position:sticky;top:0;z-index:1}
+.g-bar{width:4px;align-self:stretch;border-radius:2px;background:var(--accent)}
+.g-name{font:600 19px/1.1 var(--display);text-transform:uppercase;letter-spacing:.02em;flex:1;min-width:0;overflow-wrap:anywhere}
+.g-name input{font:inherit;text-transform:none;width:100%;padding:3px 6px;border:1px solid var(--accent);border-radius:4px;background:var(--surface)}
+.g-count{font:500 12px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.g-actions{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end}
+.g-drop{margin:8px 16px 10px;padding:14px;border:1px dashed var(--line);border-radius:6px;text-align:center;color:var(--muted);font-size:13px}
+.ch{display:grid;grid-template-columns:14px 26px minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line);cursor:grab;background:var(--surface)}
+.g-head + .ch{border-top:0}
+.ch.drop-before{box-shadow:inset 0 3px 0 var(--accent)}
+.ch-num{font:500 12px/1 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+.ch-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+.ch-name{font-weight:500;overflow-wrap:anywhere}
+.ch-url{font:12px/1.35 var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-flags{display:flex;gap:5px;flex-wrap:wrap}
+.ch-actions{display:flex;gap:0;flex-wrap:wrap;justify-content:flex-end}
+.ch.editing,.card.editing{background:var(--accent-soft)}
+
+/* batch groups */
+.lg{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.lg-row{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1.15fr);gap:10px;align-items:center;padding:7px 10px;border-top:1px solid var(--line)}
+.lg-head{background:var(--surface-2);font:500 11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-top:0}
+.lg-name{font-weight:500;overflow-wrap:anywhere}
+.lg-n{font:500 12px/1 var(--mono);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.lg-row .in{padding:6px 8px}
+.lg-row.changed{background:var(--accent-soft)}
+.lg-row.changed .lg-name{text-decoration:line-through;color:var(--muted)}
+.lg-body{max-height:260px;overflow:auto;display:flex;flex-direction:column}
+.lg-body .lg-row:first-child{border-top:0}
+
+/* output */
+.out-opts{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.chk{display:inline-flex;gap:7px;align-items:center;font-size:14px;cursor:pointer}
+.chk input{accent-color:var(--accent);width:16px;height:16px}
+.code{background:var(--code-bg);color:var(--code-ink);border-radius:6px;font:12.5px/1.6 var(--mono);padding:14px 16px;max-height:420px;overflow:auto;white-space:pre;margin:0}
+.code .k{color:var(--code-key)} .code .g{color:var(--code-grp)} .code .d{color:var(--code-dim)}
+#outRaw{position:absolute;left:-9999px;width:1px;height:1px}
+.status{font-size:13px;color:var(--ok);min-height:1.2em}
+.status.bad{color:var(--tally)}
+.notice{font-size:13px;color:var(--warn);background:var(--warn-soft);padding:8px 12px;border-radius:6px;margin:0}
+
+/* catalog */
+.cat-tools{display:flex;flex-wrap:wrap;gap:8px}
+.cat-tools .in{flex:1 1 180px;max-width:320px}
+.tbl-wrap{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);position:sticky;top:0}
+td.al{font:12px/1.45 var(--mono);color:var(--muted);max-width:380px}
+tr:last-child td{border-bottom:0}
+.cat-form{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 140px minmax(0,1.6fr) auto;gap:10px;align-items:end}
+@media (max-width:980px){.cat-form{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.cat-form{grid-template-columns:1fr}}
+.dbstate{font:500 12px/1 var(--mono);color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dbstate.on .dot{background:var(--ok)} .dbstate.off .dot{background:var(--tally)}
+
+.srv-form{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1.2fr) 170px auto}
+@media (max-width:980px){.srv-form{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.srv-form{grid-template-columns:1fr}}
+td.mono{font:13px/1.45 var(--mono)}
+tr.off td{color:var(--muted)}
+tr.off td:first-child{text-decoration:line-through}
+
+.folderbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);font-size:14px}
+.folderbar #folderTxt{flex:1 1 260px}
+.folderbar.warn{background:var(--warn-soft);border-color:transparent}
+
+.hdot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:1px;flex:none;background:var(--muted)}
+.hdot.ok{background:#22A559;box-shadow:0 0 0 3px rgba(34,165,89,.18)}
+.hdot.off{background:#D93A26;box-shadow:0 0 0 3px rgba(217,58,38,.18)}
+.hdot.run{background:#1F6FEB;box-shadow:0 0 0 3px rgba(31,111,235,.25)}
+.hdot.unk{background:transparent;border:2px solid var(--muted)}
+.hdot.none{background:var(--line)}
+@media (prefers-reduced-motion:no-preference){.hdot.run{animation:pulse .8s ease-in-out infinite alternate}@keyframes pulse{to{box-shadow:0 0 0 6px rgba(31,111,235,.08)}}}
+.legend{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px}
+.legend .hdot{margin-right:4px}
+
+.status{min-height:0}
+.status:not(:empty){padding:8px 12px;border-radius:6px;background:var(--surface);border:1px solid var(--line)}
+.vod-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);align-items:start}
+.vod-grid > .panel-b{border-right:1px solid var(--line)}
+@media (max-width:860px){.vod-grid{grid-template-columns:minmax(0,1fr)}.vod-grid > .panel-b{border-right:0;border-bottom:1px solid var(--line)}}
+textarea.in.small{min-height:56px;font-family:var(--body);font-size:14px}
+.bulk summary{cursor:pointer;font-weight:500;font-size:14px}
+.bulk[open]{display:flex;flex-direction:column;gap:8px}
+.bulk textarea{min-height:110px}
+.vitem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line)}
+.g-head + .vitem{border-top:0}
+.vitem.sel{background:var(--accent-soft)}
+.vmeta{font:12px/1.4 var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.epbox{border-top:1px solid var(--line);padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.epbox h3{font-size:20px;text-transform:uppercase}
+.ep-form{display:grid;grid-template-columns:70px 70px minmax(0,1fr);gap:8px;align-items:end}
+.ep-form .ep-url{grid-column:1 / -1}
+.ep-form .btns{grid-column:1 / -1}
+.ep-season{font:600 14px/1 var(--display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:10px 0 4px}
+.ep-row{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line);font-size:14px}
+.ep-row .vmeta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep-form .err{grid-column:1 / -1;margin:2px 0 0}
+.ep-edit{background:var(--accent-soft);border-top:1px solid var(--line);padding:10px 0 14px}
+.hdot.fora{background:#8B3FD9;box-shadow:0 0 0 3px rgba(139,63,217,.2)}
+.ch.fora .ch-name,.ch.fora .ch-url{opacity:.6}
+
+.ctabs-wrap{padding:12px 16px 0}
+.ctabs .tab small{font:500 11px/1 var(--mono);color:var(--muted);margin-left:4px}
+.ctabs .tab.drop-over{outline:2px dashed var(--accent);outline-offset:-2px}
+.addbox{border-bottom:1px solid var(--line);padding:12px 16px}
+.addbox > summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--accent)}
+.addbox[open] > summary{margin-bottom:12px}
+.addbox .bulk{margin-top:12px}
+.vitem[draggable="true"]{cursor:grab}
+#movList:empty,#serList:empty{min-height:120px}
+
+.vedit{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px 16px;background:var(--accent-soft);border-top:1px solid var(--line)}
+.vedit .wide{grid-column:1 / -1}
+.vedit .in{background:var(--surface)}
+.ep-row.fora .ch-name,.ep-row.fora .vmeta{opacity:.6}
+.ep-row .ch-actions{display:flex;gap:0}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 12px 10px 16px;border-radius:8px;display:flex;align-items:center;gap:14px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:10;max-width:calc(100% - 32px)}
+.toast button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:13px;white-space:nowrap}
+@media (prefers-reduced-motion:no-preference){.toast{animation:up .18s ease-out}@keyframes up{from{transform:translate(-50%,8px);opacity:.3}}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow"><span class="tally" aria-hidden="true"></span>#EXTM3U · montador</span>
+      <h1>Lista de canais</h1>
+    </div>
+    <div class="stats" aria-live="polite">
+      <div class="stat"><b id="sCh">0</b><span>canais</span></div>
+      <div class="stat"><b id="sGr">0</b><span>grupos</span></div>
+      <div class="stat" id="sPendBox"><b id="sPend">0</b><span>sem grupo</span></div>
+      <div class="stat" id="sWarnBox"><b id="sWarn">0</b><span>avisos</span></div>
+    </div>
+  </header>
+
+  <div class="folderbar" id="folderBar" hidden="" aria-live="polite">
+    <span class="dbstate" id="folderState"><span class="dot"></span></span>
+    <span id="folderTxt"></span>
+    <span class="btns"><button class="btn sm primary" id="folderBtn" type="button" hidden="">Abrir pasta do servidor</button><button class="btn sm" id="folderSwap" type="button" hidden="">Trocar pasta</button></span>
+  </div>
+
+  <div class="status" id="status" aria-live="polite"></div>
+
+  <div class="grid">
+    <!-- ADICIONAR -->
+    <section class="panel" aria-labelledby="hIn">
+      <div class="panel-h"><h2 id="hIn">Adicionar</h2></div>
+      <div class="panel-b">
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" id="tab-one" aria-selected="true" data-pane="pane-one">Um canal</button>
+          <button class="tab" role="tab" id="tab-lote" aria-selected="false" data-pane="pane-lote">Lista em lote</button>
+        </div>
+
+        <form id="pane-one" class="panel-b" style="padding:0" novalidate="">
+          <div class="field">
+            <label for="fName">Nome do canal</label>
+            <input class="in" id="fName" autocomplete="off" placeholder="A&amp;E">
+            <div class="suggest" id="fSuggest" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="fGroup">Grupo <em>(vazio = vai para Canais inseridos)</em></label>
+            <input class="in" id="fGroup" list="groupList" autocomplete="off" placeholder="Preenchido pelo catálogo quando reconhece o canal">
+            <datalist id="groupList"></datalist>
+            <p class="hint">Grupos como <code>Filmes | Ação</code> ou <code>Séries | Netflix</code> criam direto um filme ou uma série, em vez de um canal.</p>
+          </div>
+          <div class="field">
+            <label for="fUrl">Link do stream</label>
+            <input class="in mono" id="fUrl" autocomplete="off" inputmode="url" placeholder="https://servidor.com/canal/playlist.m3u8">
+          </div>
+          <div class="field">
+            <label for="fLogo">Logo <em>(opcional)</em></label>
+            <input class="in mono" id="fLogo" autocomplete="off" inputmode="url" placeholder="https://…/logo.png">
+          </div>
+          <p class="err" id="fErr"></p>
+          <div class="btns">
+            <button class="btn primary" id="fSubmit" type="submit">Adicionar canal</button>
+            <button class="btn" id="fCancel" type="button" hidden="">Cancelar edição</button>
+          </div>
+        </form>
+
+        <div id="pane-lote" class="panel-b" style="padding:0" hidden="">
+          <p class="hint">Cole uma lista pronta (<code>.m3u</code> / <code>.m3u8</code>) ou linhas no formato <code>Grupo | Nome | Link | Logo</code>.</p>
+          <div class="field">
+            <label for="lText">Lista</label>
+            <textarea class="in" id="lText" spellcheck="false" wrap="off" placeholder="#EXTM3U
+#EXTINF:-1 group-title=&quot;Filmes&quot;,A&amp;E
+https://…/playlist.m3u8
+
+ou
+
+Filmes | A&amp;E | https://…/playlist.m3u8"></textarea>
+          </div>
+          <div class="btns">
+            <label class="btn file-label" for="lFile">Abrir arquivo…<input type="file" id="lFile" accept=".m3u,.m3u8,.txt,audio/x-mpegurl,application/vnd.apple.mpegurl,text/plain"></label>
+            <button class="btn" id="lLoad" type="button">Carregar lista atual</button>
+          </div>
+          <div class="field">
+            <label for="lMode">Onde colocar os canais</label>
+            <select class="in" id="lMode">
+              <option value="catalogo">Grupo do catálogo (se não reconhecer, usa o grupo da lista)</option>
+              <option value="lista">Grupo da lista (com os nomes novos da tabela)</option>
+              <option value="inseridos">Canais inseridos, sem grupo (para arrastar depois)</option>
+              <option value="filmes">Filmes (usa o grupo da lista)</option>
+              <option value="series">Séries (usa o grupo da lista)</option>
+            </select>
+            <p class="hint">Um grupo do tipo <code>Filmes | Ação</code> ou <code>Séries | Netflix</code> vai direto para lá, não importa a opção escolhida acima.</p>
+          </div>
+          <p class="hint" id="lSummary" hidden=""></p>
+          <div class="lg" id="lGroups" hidden=""></div>
+          <div class="field" id="lAllBox" hidden="">
+            <label for="lAll">Colocar todos no mesmo grupo <em>(opcional, vale mais que as opções acima)</em></label>
+            <input class="in" id="lAll" list="groupList" autocomplete="off" placeholder="Ex.: Canais Abertos">
+          </div>
+          <p class="err" id="lErr"></p>
+          <div class="btns">
+            <button class="btn primary" id="lAdd" type="button" disabled="">Adicionar à lista</button>
+            <button class="btn" id="lReplace" type="button" disabled="">Substituir a lista</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CANAIS INSERIDOS -->
+    <section class="panel" aria-labelledby="hIns">
+      <div class="panel-h">
+        <h2 id="hIns">Canais inseridos <small id="insCount"></small></h2>
+        <button class="btn sm" id="applyAll" type="button" hidden="">Usar sugestões</button>
+      </div>
+      <div class="panel-b" style="padding-bottom:0">
+        <div class="tabs" role="group" aria-label="Mostrar">
+          <button class="tab" id="vPend" type="button" aria-pressed="true">Sem grupo</button>
+          <button class="tab" id="vAll" type="button" aria-pressed="false">Todos</button>
+        </div>
+        <p class="hint">Arraste um card para um grupo em <b>Canais por grupo</b>, ou escolha o grupo no próprio card.</p>
+      </div>
+      <div class="inbox scroll" id="inbox" data-drop="inbox"></div>
+    </section>
+
+    <!-- CANAIS -->
+    <section class="panel p-groups" aria-labelledby="hList">
+      <div class="panel-h">
+        <h2 id="hList">Canais</h2>
+        <div class="btns">
+          <input class="in search" id="q" type="search" placeholder="Buscar" aria-label="Buscar canal ou grupo">
+          <button class="btn sm primary test-only" id="checkAll" type="button" hidden="">Verificar canais</button>
+          <button class="btn sm test-only" id="dropRed" type="button" hidden="">Tirar vermelhos da lista</button>
+          <button class="btn sm" id="newGroupBtn" type="button">Novo grupo</button>
+          <button class="btn sm danger" id="clearAll" type="button">Limpar tudo</button>
+        </div>
+      </div>
+      <span id="movCount" hidden=""></span><span id="serCount" hidden=""></span>
+      <div class="ctabs-wrap">
+        <div class="tabs ctabs" role="tablist" aria-label="Tipo de conteúdo">
+          <button class="tab" role="tab" type="button" data-ctab="live" aria-selected="true">TV ao vivo <small id="ctLive"></small></button>
+          <button class="tab" role="tab" type="button" data-ctab="movie" aria-selected="false">Filmes <small id="ctMovie"></small></button>
+          <button class="tab" role="tab" type="button" data-ctab="series" aria-selected="false">Séries <small id="ctSeries"></small></button>
+        </div>
+      </div>
+      <form class="newgroup" id="newGroupForm" hidden="" novalidate="">
+        <input class="in" id="ngName" autocomplete="off" placeholder="Nome do grupo" aria-label="Nome do novo grupo">
+        <button class="btn primary sm" type="submit">Criar</button>
+        <button class="btn sm live-only" type="button" id="ngStd">Criar grupos do catálogo</button>
+        <button class="btn sm" type="button" id="ngCancel">Fechar</button>
+      </form>
+      <p class="hint legend test-only" id="legendTxt" hidden=""></p>
+      <div id="ct-live">
+        <div class="scroll" id="groups"></div>
+      </div>
+      <div id="ct-movie" hidden="">
+        <datalist id="movGroupList"></datalist>
+        <div class="scroll" id="movList" data-drop="mlist"></div>
+      </div>
+      <div id="ct-series" hidden="">
+        <datalist id="serGroupList"></datalist>
+        <div class="scroll" id="serList" data-drop="slist"></div>
+        <div class="panel-b"><div class="epbox" id="epBox" hidden="">
+          <h3>Episódios de <span id="epSerie"></span></h3>
+          <form class="ep-form" id="epForm" novalidate="">
+            <div class="field"><label for="eTemp">Temp.</label><input class="in" id="eTemp" type="number" min="1" value="1"></div>
+            <div class="field"><label for="eNum">Ep.</label><input class="in" id="eNum" type="number" min="1" value="1"></div>
+            <div class="field"><label for="eTit">Título <em>(opcional)</em></label><input class="in" id="eTit" autocomplete="off"></div>
+            <div class="field ep-url"><label for="eUrl">Link do episódio</label><input class="in mono" id="eUrl" autocomplete="off" inputmode="url" placeholder="https://…/s01e01.mp4"></div>
+            <div class="btns"><button class="btn primary" type="submit">Adicionar episódio</button></div>
+          </form>
+          <p class="err" id="eErr"></p>
+          <details class="bulk">
+            <summary>Colar vários episódios</summary>
+            <p class="hint">Um por linha: <code>Temporada | Episódio | Título | Link</code> ou <code>Temporada | Episódio | Link</code>.</p>
+            <textarea class="in" id="eBulk" spellcheck="false" wrap="off" placeholder="1 | 1 | Piloto | https://…/s01e01.mp4"></textarea>
+            <p class="err" id="eBulkErr"></p>
+            <button class="btn" id="eBulkAdd" type="button">Adicionar episódios</button>
+          </details>
+          <div id="epList"></div>
+        </div></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- LISTA MONTADA -->
+  <section class="panel m3u-only" id="secOut" hidden="" aria-labelledby="hOut">
+    <div class="panel-h">
+      <h2 id="hOut">Lista montada</h2>
+      <div class="btns">
+        <button class="btn" id="copy" type="button">Copiar lista</button>
+        <button class="btn" id="dlTxt" type="button" hidden="">Baixar lista (.txt)</button>
+        <button class="btn primary" id="dlZip" type="button" hidden="">Baixar pacote Netlify (.zip)</button>
+      </div>
+    </div>
+    <div class="panel-b">
+      <div class="out-opts">
+        <label class="chk"><input type="checkbox" id="oGap" checked=""> Linha em branco entre grupos</label>
+        <label class="chk"><input type="checkbox" id="oTitle"> Comentário com o nome do grupo</label>
+      </div>
+      <pre class="code" id="out" aria-label="Prévia da lista"></pre>
+      <textarea id="outRaw" readonly="" tabindex="-1" aria-hidden="true"></textarea>
+      <p class="hint">O pacote .zip já vem com <code>lista.m3u8</code>, <code>_headers</code>, <code>_redirects</code> e a página inicial. É só extrair e arrastar a pasta em app.netlify.com/drop.</p>
+    </div>
+  </section>
+
+  <!-- SERVIDOR COM LOGIN -->
+  <section class="panel" aria-labelledby="hSrv">
+    <div class="panel-h">
+      <h2 id="hSrv">Servidor com login <small id="usrCount"></small></h2>
+      <div class="btns">
+        <button class="btn primary" id="dlSrv" type="button" hidden="">Baixar servidor (.zip)</button>
+      </div>
+    </div>
+    <div class="panel-b">
+      <p class="hint">Gera o site com login no padrão do IPTV Smarters (<b>Login with Xtream Codes API</b>): cada pessoa entra com usuário, senha e o endereço do site. Vão para o servidor os canais, filmes e séries que estão em grupos aqui no Montador (menos os canais tirados da lista, com bolinha roxa). Esse pacote é publicado com o <code>publicar.bat</code> que vem dentro dele, não pelo arraste no Netlify.</p>
+      <p class="notice" id="pendNotice" hidden=""></p>
+      <div class="out-opts">
+        <label class="chk"><input type="checkbox" id="oSort"> Canais em ordem A–Z</label>
+        <div class="field" style="flex:1;min-width:220px;max-width:520px">
+          <label for="oEpg">Guia de programação (EPG) <em>(opcional)</em></label>
+          <input class="in mono" id="oEpg" placeholder="https://…/guia.xml">
+        </div>
+      </div>
+      <form class="cat-form srv-form" id="usrForm" novalidate="">
+        <div class="field"><label for="uUser">Usuário</label><input class="in mono" id="uUser" autocomplete="off" placeholder="joao" autocapitalize="none" spellcheck="false"></div>
+        <div class="field"><label for="uPass">Senha</label><div class="btns" style="flex-wrap:nowrap"><input class="in mono" id="uPass" autocomplete="off" spellcheck="false" autocapitalize="none"><button class="btn sm" id="uGen" type="button">Gerar</button></div></div>
+        <div class="field"><label for="uNome">Nome <em>(opcional)</em></label><input class="in" id="uNome" autocomplete="off" placeholder="João (sobrinho)"></div>
+        <div class="field"><label for="uVal">Válido até <em>(opcional)</em></label><input class="in" id="uVal" type="date"></div>
+        <div class="btns"><button class="btn primary" id="uSave" type="submit">Adicionar</button><button class="btn" id="uCancel" type="button" hidden="">Cancelar</button></div>
+      </form>
+      <p class="err" id="uErr"></p>
+      <div class="field" style="max-width:420px">
+        <label for="uSite">Endereço do site <em>(depois de publicar, para copiar os dados de acesso)</em></label>
+        <input class="in mono" id="uSite" autocomplete="off" placeholder="https://tv-da-familia.netlify.app">
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Usuário</th><th>Senha</th><th>Nome</th><th>Válido até</th><th>Ativo</th><th></th></tr></thead>
+          <tbody id="usrBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATÁLOGO -->
+  <section class="panel" aria-labelledby="hCat">
+    <div class="panel-h">
+      <h2 id="hCat">Catálogo de canais <small id="catCount"></small></h2>
+      <span class="dbstate" id="dbState"><span class="dot"></span><span id="dbStateTxt">Conectando…</span></span>
+    </div>
+    <div class="panel-b">
+      <p class="hint">É por aqui que a página reconhece o canal pelo nome e sugere o grupo. Os apelidos também valem: "HBO 2 HD", "A&amp;E FHD" e "BR: A&amp;E" são reconhecidos. Canais que você arrasta para um grupo podem ser salvos aqui. Nesta versão, o catálogo e as suas alterações ficam salvos no navegador.</p>
+      <form class="cat-form" id="catForm" novalidate="">
+        <div class="field"><label for="cNome">Nome</label><input class="in" id="cNome" autocomplete="off" placeholder="A&amp;E"></div>
+        <div class="field"><label for="cGrupo">Grupo</label><input class="in" id="cGrupo" list="catGroupList" autocomplete="off" placeholder="Filmes e Séries"><datalist id="catGroupList"></datalist></div>
+        <div class="field"><label for="cTipo">Tipo</label><select class="in" id="cTipo"><option value="fechada">TV fechada</option><option value="aberta">TV aberta</option></select></div>
+        <div class="field"><label for="cApel">Apelidos <em>(separados por vírgula)</em></label><input class="in" id="cApel" autocomplete="off" placeholder="a e, ae"></div>
+        <div class="btns"><button class="btn primary" id="cSave" type="submit">Salvar</button><button class="btn" id="cCancel" type="button" hidden="">Cancelar</button></div>
+      </form>
+      <p class="err" id="cErr"></p>
+      <div class="cat-tools">
+        <input class="in" id="cq" type="search" placeholder="Buscar no catálogo" aria-label="Buscar no catálogo">
+        <select class="in" id="cfg" aria-label="Filtrar por grupo" style="max-width:220px"><option value="">Todos os grupos</option></select>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Canal</th><th>Grupo</th><th>Tipo</th><th>Apelidos</th><th></th></tr></thead>
+          <tbody id="catBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" hidden=""><span id="toastMsg"></span><button id="toastBtn" type="button">Desfazer</button></div>
+
+<script>
+(function(){
+const SELF_HTML = '<!doctype html>\n' + document.documentElement.outerHTML;
+const SEED = [{"name": "Canal UOL (1080p)", "group": "General", "url": "https://video24.mais.uol.com.br/live/6146.m3u8", "logo": "https://conteudo.imguol.com.br/c/play/logo_canaluol_2024.svg", "tvgId": "CanalUOL.br@SD"}, {"name": "Chroma TV (480p)", "group": "Entertainment", "url": "https://5c483b9d1019c.streamlock.net/8054/8054/playlist.m3u8", "logo": "https://i.imgur.com/SnaIMgj.png", "tvgId": "ChromaTV.br@SD"}, {"name": "Cinturao Verde", "group": "General", "url": "https://play.redecinturaoverde.com.br/playlist.m3u8", "logo": "https://eswqkrogupaisirwcsys.supabase.co/storage/v1/object/public/mbc-media/canais/1775688612576-u0628igjimf.png", "tvgId": "CinturaoVerde.br@SD"}, {"name": "Conexao TV (720p)", "group": "General", "url": "https://5a57bda70564a.streamlock.net/conexaotv/conexaotv.sdp/playlist.m3u8", "logo": "https://i.imgur.com/CJ9SPsZ.png", "tvgId": "ConexaoTV.br@SD"}, {"name": "Fala Litoral (480p)", "group": "General", "url": "https://5c483b9d1019c.streamlock.net/falalitoraltv/falalitoraltv/playlist.m3u8", "logo": "https://i.imgur.com/NF6PL8O.png", "tvgId": "FalaLitoral.br@SD"}, {"name": "Fonte TV", "group": "Religious", "url": "https://59fb88a1b1108.streamlock.net/fonte/_definst_/fontetv/playlist.m3u8", "logo": "https://i.imgur.com/7q2BmNc.png", "tvgId": "FonteTV.br@SD"}, {"name": "MBC Brasil TV", "group": "General", "url": "https://play.mbcbrasil.tv.br/playlist.m3u8", "logo": "https://eswqkrogupaisirwcsys.supabase.co/storage/v1/object/public/mbc-media/canais/1775702325773-d10vtu076za.png", "tvgId": "MBCBrasilTV.br@SD"}, {"name": "Nova Era TV (1080p) [Not 24/7]", "group": "Undefined", "url": "http://wz3.dnip.com.br:1935/novaeratv/novaeratv.sdp/live.m3u8", "logo": "https://i.imgur.com/IK3F9Uq.png", "tvgId": "NovaEraTV.br@SD"}, {"name": "TV Clube (720p)", "group": "Undefined", "url": "https://5c483b9d1019c.streamlock.net/8186/8186/playlist.m3u8", "logo": "https://i.imgur.com/CpXjcyE.png", "tvgId": "TVClube.br@SD"}, {"name": "TV Comunitaria (360p)", "group": "General", "url": "https://5b7f3c45ab7c2.streamlock.net/8008/smil:8008.smil/playlist.m3u8?DVR=", "logo": "https://i.imgur.com/uxefHY3.png", "tvgId": "TVComunitaria.br@SD"}, {"name": "TV Mais Marica (1080p)", "group": "General", "url": "https://5cf4a2c2512a2.streamlock.net/tvmaismarica/tvmaismarica/playlist.m3u8", "logo": "https://i.imgur.com/lgCRX7q.png", "tvgId": "TVMaisMarica.br@SD"}, {"name": "TV Pantanal MS (360p) [Not 24/7]", "group": "Undefined", "url": "https://5a2b083e9f360.streamlock.net/tvpantanal/tvpantanal.sdp/playlist.m3u8", "logo": "https://i.imgur.com/0FOmktl.png", "tvgId": "TVPantanalMS.br@SD"}, {"name": "TV Passo Fundo (720p)", "group": "General", "url": "https://5a57bda70564a.streamlock.net/tvpasso/tvpasso.sdp/playlist.m3u8", "logo": "https://i.imgur.com/QFE6TiV.png", "tvgId": "TVPassoFundo.br@SD"}, {"name": "TV Sim Cachoeiro (720p)", "group": "News", "url": "https://5cf4a2c2512a2.streamlock.net/8104/8104/playlist.m3u8", "logo": "https://i.imgur.com/t5oUK3C.png", "tvgId": "TVSimCachoeiro.br@SD"}, {"name": "TV Sim Sao Mateus (720p)", "group": "News", "url": "https://5cf4a2c2512a2.streamlock.net/8236/8236/playlist.m3u8", "logo": "https://i.imgur.com/t5oUK3C.png", "tvgId": "TVSimSaoMateus.br@SD"}, {"name": "TV Sul de Minas (720p)", "group": "General", "url": "https://5cf4a2c2512a2.streamlock.net/tvsuldeminas/tvsuldeminas/playlist.m3u8", "logo": "https://i.imgur.com/hPh8cxK.png", "tvgId": "TVSuldeMinas.br@SD"}, {"name": "TV Terceiro Anjo (360p)", "group": "Religious", "url": "https://streamer1.streamhost.org/salive/GMI3anjoh/playlist.m3u8", "logo": "https://i.imgur.com/PExKWNv.png", "tvgId": "TVTerceiroAnjo.br@SD"}, {"name": "TV UFG (720p) [Not 24/7]", "group": "Education", "url": "http://flash.softhost.com.br:1935/ufg/tvufgweb/playlist.m3u8", "logo": "https://i.imgur.com/Yp3dbJo.png", "tvgId": "TVUFG.br@SD"}, {"name": "TV Vicosa (480p)", "group": "Entertainment", "url": "http://wz4.dnip.com.br/fratevitv/fratevitv.sdp/playlist.m3u8", "logo": "https://i.imgur.com/TZF55f9.png", "tvgId": "TVVicosa.br@SD"}];
+const KEY = 'montador-m3u-v2', OLD_KEY = 'montador-m3u-v1';
+const $ = id => document.getElementById(id);
+let seq = 0;
+const uid = () => 'c' + Date.now().toString(36) + (seq++).toString(36);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let state = {channels: [], groupOrder: [], movies: [], movieGroups: [], series: [], seriesGroups: [], opts: {sort:false, gap:true, title:false, epg:''}};
+let editingId = null, filter = '', view = 'pend';
+
+/* ================= estado ================= */
+function load(){
+  let saved = null, old = false;
+  try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch(e) {}
+  if (!saved) { try { saved = JSON.parse(localStorage.getItem(OLD_KEY) || 'null'); old = true; } catch(e) {} }
+  if (saved && Array.isArray(saved.channels)) {
+    state.channels = saved.channels.map(c => Object.assign({tvgId:'', logo:''}, c, {group: old && c.group === 'Sem grupo' ? '' : (c.group || '')}));
+    state.groupOrder = (saved.groupOrder || []).filter(g => g && !(old && g === 'Sem grupo'));
+    state.opts = Object.assign(state.opts, saved.opts || {});
+    ['movies','movieGroups','series','seriesGroups'].forEach(k => { state[k] = Array.isArray(saved[k]) ? saved[k] : []; });
+  } else {
+    SEED.forEach(c => addChannel(c));
+  }
+}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} if (typeof onDataChange === 'function') onDataChange(); }
+
+const clean = s => (s || '').replace(/\s+/g, ' ').trim();
+function ensureGroup(g){ if (g && !state.groupOrder.includes(g)) state.groupOrder.push(g); }
+function addChannel(c){
+  const ch = {id: uid(), name: clean(c.name), group: clean(c.group), url: (c.url||'').trim(), logo: (c.logo||'').trim(), tvgId: (c.tvgId||'').trim()};
+  state.channels.push(ch); ensureGroup(ch.group);
+  return ch;
+}
+function syncGroups(){ state.channels.forEach(c => ensureGroup(c.group)); }
+const byId = id => state.channels.find(c => c.id === id);
+
+/* ================= catálogo ================= */
+let catalog = [], catIndex = [], db = null, dbOn = false;
+function norm(s){
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/&/g, ' ').replace(/\+/g, ' plus ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+const slug = s => norm(s).replace(/ /g, '-') || 'canal';
+const NOISE = new Set(['hd','fhd','uhd','sd','4k','h265','hevc','h264','1080p','720p','480p','360p','1080','720','alt','backup','bkp','opcao','op','24h','ao','vivo','live','ppv']);
+function cleanName(n){
+  let s = (n || '').replace(/\[\/?COLOR[^\]]*\]/gi, '').replace(/\[[^\]]*\]/g, ' ').replace(/\([^)]*\)/g, ' ');
+  s = s.replace(/^\s*(br|bra|brasil|pt|pt-br)\s*[:|\-]\s*/i, '').replace(/^\s*\|\s*br\s*\|\s*/i, '');
+  return norm(s).split(' ').filter(t => !NOISE.has(t)).join(' ');
+}
+function rebuildIndex(){
+  catIndex = [];
+  catalog.forEach(e => {
+    [e.nome].concat(e.apelidos || []).forEach(a => { const k = norm(a); if (k) catIndex.push([k, e]); });
+  });
+  catIndex.sort((a, b) => b[0].length - a[0].length);
+}
+function matchCatalog(name){
+  if (!catIndex.length) return null;
+  const n = cleanName(name); if (!n) return null;
+  const tries = [n, n.replace(/^(tv|canal|rede) /, '')];
+  for (const t of tries) for (const [k, e] of catIndex) if (t === k || t.startsWith(k + ' ')) return e;
+  return null;
+}
+const tipoLabel = t => t === 'aberta' ? 'TV aberta' : t === 'fechada' ? 'TV fechada' : '';
+
+/* ================= validação ================= */
+const URL_RE = /^(https?|rtmp|rtsp|rtp|udp|mms):\/\/[^\s]+$/i;
+function dupUrls(){
+  const seen = new Map(), d = new Set();
+  state.channels.forEach(c => { const u = c.url.toLowerCase(); if (seen.has(u)) { d.add(u); } else seen.set(u, 1); });
+  return d;
+}
+function warningsFor(c, dups){
+  const w = [];
+  if (!URL_RE.test(c.url) || /^https?:\/\/?$/i.test(c.url)) w.push('link inválido');
+  if (dups.has(c.url.toLowerCase())) w.push('link repetido');
+  if (/chunklist_w\d+/i.test(c.url)) w.push('link temporário');
+  if (!c.name) w.push('sem nome');
+  return w;
+}
+function streamInfo(url){
+  const m = url.match(/^([a-z]+):/i), proto = m ? m[1].toUpperCase() : '?';
+  const path = url.split('?')[0].toLowerCase();
+  const fmt = /\.m3u8$/.test(path) ? 'HLS' : /\.ts$/.test(path) ? 'TS' : /\.mpd$/.test(path) ? 'DASH' : /\.mp4$/.test(path) ? 'MP4' : '';
+  return [proto, fmt].filter(Boolean);
+}
+
+/* ================= M3U ================= */
+const attr = s => (s || '').replace(/"/g, "'");
+function groupLists(includeEmpty){
+  const out = [];
+  state.groupOrder.forEach(g => {
+    let list = state.channels.filter(c => c.group === g);
+    if (state.opts.sort) list = list.slice().sort((a,b) => a.name.localeCompare(b.name, 'pt-BR', {sensitivity:'base', numeric:true}));
+    if (list.length || includeEmpty) out.push([g, list]);
+  });
+  return out;
+}
+function buildM3U(){
+  const o = state.opts, lines = [];
+  lines.push(o.epg.trim() ? `#EXTM3U x-tvg-url="${attr(o.epg.trim())}"` : '#EXTM3U');
+  groupLists(false).forEach(([g, list], gi) => {
+    if (o.gap && gi > 0) lines.push('');
+    if (o.title) lines.push(`# ===== ${g} =====`);
+    list.filter(c => !c.fora).forEach(c => {
+      let a = '';
+      if (c.tvgId) a += ` tvg-id="${attr(c.tvgId)}"`;
+      a += ` tvg-name="${attr(c.name)}"`;
+      if (c.logo) a += ` tvg-logo="${attr(c.logo)}"`;
+      a += ` group-title="${attr(g)}"`;
+      lines.push(`#EXTINF:-1${a},${c.name}`);
+      lines.push(c.url);
+    });
+  });
+  return lines.join('\n') + '\n';
+}
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+function highlight(text){
+  return text.split('\n').map(l => {
+    if (l.startsWith('#EXTINF')) return esc(l).replace(/^(#EXTINF:-1)/, '<span class="k">$1</span>').replace(/(group-title=&quot;)(.*?)(&quot;)/, '$1<span class="g">$2</span>$3');
+    if (l.startsWith('#')) return `<span class="d">${esc(l)}</span>`;
+    return esc(l);
+  }).join('\n');
+}
+
+/* ================= leitura de listas ================= */
+function parseExtinf(line){
+  const body = line.replace(/^#EXTINF\s*:\s*/i, '');
+  const attrs = {};
+  const dur = body.match(/^\s*-?\d+(\.\d+)?/);
+  const i = dur ? dur[0].length : 0;
+  let inQ = false, commaAt = -1;
+  for (let j = i; j < body.length; j++) { const ch = body[j]; if (ch === '"') inQ = !inQ; else if (ch === ',' && !inQ) commaAt = j; }
+  const attrPart = commaAt >= 0 ? body.slice(i, commaAt) : body.slice(i);
+  let name = commaAt >= 0 ? body.slice(commaAt + 1) : '';
+  attrPart.replace(/([\w-]+)\s*=?\s*"([^"]*)"/g, (_, k, v) => { k = k.toLowerCase(); if (!attrs[k]) attrs[k] = v; return ''; });
+  if (/group-title/i.test(attrs['group-title'] || '')) attrs['group-title'] = '';
+  name = clean(name.replace(/\[\/?COLOR[^\]]*\]/gi, '')) || clean(attrs['tvg-name']);
+  return {name, group: attrs['group-title'] || attrs['tvg-group'] || '', logo: attrs['tvg-logo'] || '', tvgId: attrs['tvg-id'] && !/^https?:/i.test(attrs['tvg-id']) ? attrs['tvg-id'] : ''};
+}
+function parseM3U(text){
+  const lines = text.replace(/\r/g, '').split('\n').map(l => l.trim());
+  const items = []; let pending = null, grp = '', skipped = 0;
+  for (const l of lines) {
+    if (!l) continue;
+    if (/^#EXTINF/i.test(l)) { if (pending) skipped++; pending = parseExtinf(l); continue; }
+    if (/^#EXTGRP:/i.test(l)) { grp = l.slice(8).trim(); continue; }
+    if (l.startsWith('#')) continue;
+    if (pending) {
+      if (!pending.group && grp) pending.group = grp;
+      if (/^https?:\/\/?$/i.test(l)) skipped++; else items.push(Object.assign(pending, {url: l}));
+      pending = null; grp = '';
+    }
+  }
+  if (pending) skipped++;
+  return {items, skipped};
+}
+function parseBulk(text){
+  const items = [], errors = [];
+  text.replace(/\r/g, '').split('\n').forEach((raw, n) => {
+    const l = raw.trim(); if (!l) return;
+    const parts = l.split(/\s*[|;\t]\s*/);
+    if (parts.length < 3) { errors.push(`Linha ${n+1}: faltam campos (use Grupo | Nome | Link).`); return; }
+    const [group, name, url, logo, tvgId] = parts;
+    if (!URL_RE.test(url)) { errors.push(`Linha ${n+1}: o link "${url}" não parece um endereço de stream.`); return; }
+    items.push({group, name, url, logo: logo || '', tvgId: tvgId || ''});
+  });
+  return {items, errors};
+}
+
+/* ================= render ================= */
+function chip(text, cls){ const s = document.createElement('span'); s.className = 'chip' + (cls ? ' ' + cls : ''); s.textContent = text; return s; }
+function catChips(c, box, showGroupSuggestion){
+  const e = matchCatalog(c.name);
+  if (e) {
+    if (showGroupSuggestion) box.appendChild(chip((c.group === e.grupo ? 'Catálogo: ' : 'Sugestão: ') + e.grupo, 'cat'));
+    box.appendChild(chip(tipoLabel(e.tipo), e.tipo));
+  } else if (dbOn) box.appendChild(chip('Fora do catálogo'));
+  return e;
+}
+
+function render(){
+  syncGroups();
+  const dups = dupUrls();
+  let warnCount = 0;
+  state.channels.forEach(c => { if (warningsFor(c, dups).length) warnCount++; });
+  const pend = state.channels.filter(c => !c.group);
+
+  renderInbox(pend, dups);
+  renderGroups(dups);
+
+  const nonEmpty = state.groupOrder.filter(g => state.channels.some(c => c.group === g)).length;
+  $('sCh').textContent = state.channels.length;
+  $('sGr').textContent = nonEmpty;
+  $('sPend').textContent = pend.length;
+  $('sPendBox').classList.toggle('warn', pend.length > 0);
+  $('sWarn').textContent = warnCount;
+  $('sWarnBox').classList.toggle('warn', warnCount > 0);
+
+  const dl = $('groupList'); dl.textContent = '';
+  const allGroups = new Set(state.groupOrder.concat(catalog.map(e => e.grupo)));
+  allGroups.forEach(g => { const o = document.createElement('option'); o.value = g; dl.appendChild(o); });
+
+  const text = buildM3U();
+  $('out').innerHTML = highlight(text);
+  $('outRaw').value = text;
+  const inList = state.channels.length - pend.length;
+  ['copy','dlTxt','dlZip'].forEach(id => $(id).disabled = inList === 0);
+  renderVod();
+  $('ctLive').textContent = state.channels.filter(c => c.group).length; $('ctMovie').textContent = state.movies.length; $('ctSeries').textContent = state.series.length;
+  if (TEST_ENABLED) {
+    const red = tabItems(ctab).filter(c => !c.fora && health[c.url] && health[c.url].s === 'off').length;
+    $('dropRed').hidden = !red; $('dropRed').textContent = `Tirar vermelhos da lista (${red})`;
+  }
+  $('pendNotice').hidden = !pend.length;
+  $('pendNotice').textContent = `${pend.length} ${pend.length === 1 ? 'canal está' : 'canais estão'} em Canais inseridos sem grupo e ${pend.length === 1 ? 'fica' : 'ficam'} fora da lista até receber um grupo.`;
+  save();
+}
+
+function groupSelect(c, sug){
+  const sel = document.createElement('select'); sel.className = 'in'; sel.setAttribute('aria-label', 'Mover para o grupo');
+  const add = (v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); };
+  add('', c.group ? 'Mover para…' : 'Escolher grupo…');
+  if (sug && !state.groupOrder.includes(sug.grupo)) add(sug.grupo, sug.grupo + ' (novo, do catálogo)');
+  state.groupOrder.forEach(g => { if (g !== c.group) add(g, g); });
+  if (c.group) add('__none', 'Tirar do grupo');
+  sel.addEventListener('change', () => {
+    if (!sel.value) return;
+    moveChannel(c.id, sel.value === '__none' ? '' : sel.value, null);
+  });
+  return sel;
+}
+
+function renderInbox(pend, dups){
+  const box = $('inbox'); box.textContent = '';
+  const list = view === 'pend' ? pend : state.channels;
+  $('insCount').textContent = view === 'pend' ? `${pend.length}` : `${state.channels.length}`;
+  $('vPend').textContent = `Sem grupo (${pend.length})`;
+  $('vAll').textContent = `Todos (${state.channels.length})`;
+  const withSug = pend.filter(c => matchCatalog(c.name));
+  $('applyAll').hidden = !withSug.length;
+  $('applyAll').textContent = `Usar sugestões (${withSug.length})`;
+
+  if (!list.length) {
+    const e = document.createElement('div'); e.className = 'empty';
+    e.textContent = view === 'pend' ? 'Nenhum canal esperando grupo. Canais adicionados sem grupo aparecem aqui.' : 'A lista está vazia.';
+    box.appendChild(e); return;
+  }
+  list.forEach(c => {
+    const card = document.createElement('article');
+    card.className = 'card' + (c.id === editingId ? ' editing' : '');
+    card.draggable = true; card.dataset.id = c.id;
+    const top = document.createElement('div'); top.className = 'card-top';
+    const nm = document.createElement('span'); nm.className = 'card-name'; nm.textContent = c.name || '(sem nome)'; healthDot(c, nm);
+    const grip = document.createElement('span'); grip.className = 'grip'; grip.textContent = '⋮⋮'; grip.setAttribute('aria-hidden', 'true');
+    top.append(nm, grip);
+    const url = document.createElement('div'); url.className = 'card-url'; url.textContent = c.url;
+    const chips = document.createElement('div'); chips.className = 'card-chips';
+    if (c.group) chips.appendChild(chip('Grupo: ' + c.group, 'grp'));
+    const sug = catChips(c, chips, true);
+    streamInfo(c.url).forEach(t => chips.appendChild(chip(t)));
+    if (c.logo) chips.appendChild(chip('com logo'));
+    if (c.tvgId) chips.appendChild(chip('EPG: ' + c.tvgId));
+    warningsFor(c, dups).forEach(t => chips.appendChild(chip(t, 'warn')));
+    const act = document.createElement('div'); act.className = 'card-act';
+    if (sug && c.group !== sug.grupo) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm primary'; b.textContent = 'Usar sugestão';
+      b.addEventListener('click', () => moveChannel(c.id, sug.grupo, null));
+      act.appendChild(b);
+    }
+    act.appendChild(groupSelect(c, sug));
+    const ed = document.createElement('button'); ed.type = 'button'; ed.className = 'icon'; ed.textContent = 'Editar'; ed.addEventListener('click', () => startEdit(c.id));
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'icon del'; del.textContent = 'Excluir'; del.addEventListener('click', () => deleteChannel(c.id));
+    act.append(ed, del);
+    card.append(top, url, chips, act);
+    box.appendChild(card);
+  });
+}
+
+function renderGroups(dups){
+  const host = $('groups'); host.textContent = '';
+  const q = filter.toLowerCase();
+  let shown = 0, idx = 0;
+  const lists = groupLists(true);
+  lists.forEach(([g, list], gi) => {
+    const numbered = list.map(c => ({c, n: ++idx}));
+    const vis = q ? numbered.filter(({c}) => c.name.toLowerCase().includes(q) || g.toLowerCase().includes(q) || c.url.toLowerCase().includes(q)) : numbered;
+    if (q && !vis.length) return;
+    shown++;
+    const sec = document.createElement('div'); sec.className = 'group'; sec.dataset.drop = 'group'; sec.dataset.group = g;
+    const head = document.createElement('div'); head.className = 'g-head';
+    head.innerHTML = `<span class="g-bar" aria-hidden="true"></span><span class="g-name"></span><span class="g-count">${list.length}</span>
+      <span class="g-actions">
+        <button class="icon" type="button" data-act="gup" aria-label="Subir grupo" title="Subir grupo" ${gi===0?'disabled':''}>↑</button>
+        <button class="icon" type="button" data-act="gdown" aria-label="Descer grupo" title="Descer grupo" ${gi===lists.length-1?'disabled':''}>↓</button>
+        <button class="icon" type="button" data-act="grename">Renomear</button>
+        <button class="icon del" type="button" data-act="gdel">Excluir</button>
+      </span>`;
+    head.querySelector('.g-name').textContent = g;
+    sec.appendChild(head);
+    if (!list.length) {
+      const d = document.createElement('div'); d.className = 'g-drop'; d.textContent = 'Grupo vazio. Arraste canais para cá.';
+      sec.appendChild(d);
+    }
+    vis.forEach(({c, n}) => {
+      const w = warningsFor(c, dups);
+      const row = document.createElement('div');
+      row.className = 'ch' + (c.id === editingId ? ' editing' : '') + (TEST_ENABLED && c.fora ? ' fora' : '');
+      row.draggable = true; row.dataset.id = c.id;
+      row.innerHTML = `<span class="grip" aria-hidden="true">⋮⋮</span><span class="ch-num">${n}</span>
+        <div class="ch-main"><span class="ch-name"></span><span class="ch-url"></span><span class="ch-flags"></span></div>
+        <span class="ch-actions">
+          <button class="icon" type="button" data-act="up" aria-label="Subir canal" title="Subir">↑</button>
+          <button class="icon" type="button" data-act="down" aria-label="Descer canal" title="Descer">↓</button>
+          ${TEST_ENABLED && (c.fora || (health[c.url] && health[c.url].s === 'off')) ? `<button class="icon" type="button" data-act="fora">${c.fora ? 'Voltar à lista' : 'Tirar da lista'}</button>` : ''}
+          <button class="icon" type="button" data-act="edit">Editar</button>
+          <button class="icon del" type="button" data-act="del">Excluir</button>
+        </span>`;
+      row.querySelector('.ch-name').textContent = c.name || '(sem nome)'; healthDot(c, row.querySelector('.ch-name'));
+      const u = row.querySelector('.ch-url'); u.textContent = c.url; u.title = c.url;
+      const f = row.querySelector('.ch-flags');
+      const e = matchCatalog(c.name);
+      if (e && e.grupo !== g) f.appendChild(chip('Catálogo: ' + e.grupo, 'cat'));
+      w.forEach(t => f.appendChild(chip(t, 'warn')));
+      if (!f.children.length) f.remove();
+      sec.appendChild(row);
+    });
+    host.appendChild(sec);
+  });
+  if (!shown) {
+    const e = document.createElement('div'); e.className = 'empty';
+    e.textContent = q ? 'Nada encontrado para essa busca.' : 'Nenhum grupo ainda. Use "Novo grupo" ou adicione canais com grupo.';
+    host.appendChild(e);
+  }
+}
+
+/* ================= ações em canais ================= */
+function moveChannel(id, group, beforeId){
+  const c = byId(id); if (!c) return;
+  const from = c.group;
+  group = clean(group);
+  ensureGroup(group);
+  const i = state.channels.indexOf(c); state.channels.splice(i, 1);
+  c.group = group;
+  let at = -1;
+  if (beforeId && beforeId !== id) at = state.channels.findIndex(x => x.id === beforeId);
+  if (at < 0) {
+    let last = -1; state.channels.forEach((x, k) => { if (x.group === group) last = k; });
+    at = last >= 0 ? last + 1 : state.channels.length;
+  }
+  state.channels.splice(at, 0, c);
+  render();
+  if (from !== group) {
+    if (group && dbOn && !matchCatalog(c.name) && c.name) {
+      showToast(`"${c.name}" foi para ${group}. Salvar no catálogo?`, 'Salvar no catálogo', () => saveCatalog({nome: c.name, grupo: group, tipo: 'fechada', apelidos: []}, null));
+    } else {
+      flash(group ? `"${c.name}" movido para ${group}.` : `"${c.name}" voltou para Canais inseridos.`);
+    }
+  }
+}
+function deleteChannel(id){
+  const c = byId(id); if (!c) return;
+  const at = state.channels.indexOf(c);
+  state.channels.splice(at, 1);
+  if (editingId === id) resetForm();
+  render();
+  showToast(`"${c.name}" excluído.`, 'Desfazer', () => { state.channels.splice(at, 0, c); ensureGroup(c.group); render(); });
+}
+function startEdit(id){
+  const c = byId(id); if (!c) return;
+  editingId = id;
+  $('fName').value = c.name; $('fGroup').value = c.group; $('fUrl').value = c.url; $('fLogo').value = c.logo;
+  groupTouched = true;
+  $('fSubmit').textContent = 'Salvar alterações'; $('fCancel').hidden = false; $('fErr').textContent = '';
+  $('tab-one').click(); updateSuggest(); render();
+  $('fName').focus();
+  $('fName').scrollIntoView({block:'center', behavior: reduceMotion ? 'auto' : 'smooth'});
+}
+
+/* ================= formulário ================= */
+let groupTouched = false, autoGroup = '';
+function resetForm(){
+  editingId = null; groupTouched = false; autoGroup = '';
+  ['fName','fUrl','fLogo','fGroup'].forEach(id => $(id).value = '');
+  $('fErr').textContent = ''; $('fSuggest').textContent = '';
+  $('fSubmit').textContent = 'Adicionar canal'; $('fCancel').hidden = true;
+}
+function updateSuggest(){
+  const box = $('fSuggest'); box.textContent = '';
+  const name = $('fName').value;
+  const e = matchCatalog(name);
+  if (e) {
+    box.append(chip('Catálogo: ' + e.nome, 'cat'), chip(e.grupo, 'grp'), chip(tipoLabel(e.tipo), e.tipo));
+    if (!groupTouched) { $('fGroup').value = e.grupo; autoGroup = e.grupo; }
+  } else {
+    if (!groupTouched && $('fGroup').value === autoGroup) { $('fGroup').value = ''; autoGroup = ''; }
+    if (clean(name) && dbOn) box.appendChild(chip('Fora do catálogo'));
+  }
+}
+$('fName').addEventListener('input', updateSuggest);
+$('fGroup').addEventListener('input', () => { groupTouched = $('fGroup').value !== '' && $('fGroup').value !== autoGroup; });
+$('pane-one').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = clean($('fName').value), group = clean($('fGroup').value), url = $('fUrl').value.trim(), logo = $('fLogo').value.trim();
+  const errs = [];
+  if (!name) errs.push('Escreva o nome do canal.');
+  if (!URL_RE.test(url)) errs.push('O link precisa começar com http://, https:// ou rtmp:// e não pode ter espaços.');
+  if (logo && !/^https?:\/\/\S+$/i.test(logo)) errs.push('O logo precisa ser um link http:// ou https://.');
+  if (errs.length) { $('fErr').textContent = errs.join(' '); return; }
+  if (editingId) {
+    const c = byId(editingId);
+    if (c) { Object.assign(c, {name, group, url, logo}); ensureGroup(group); }
+    flash('Canal atualizado.');
+    resetForm();
+  } else {
+    const split = splitVodGroup(group);
+    if (split && !VOD_URL_RE.test(url)) { $('fErr').textContent = 'Esse grupo é de Filmes ou Séries: o link precisa começar com http:// ou https://.'; return; }
+    if (split && split.kind === 'movie') {
+      const g = split.sub || 'Filmes';
+      pushMovie({name, url, logo}, g);
+      flash(`"${name}" identificado como filme (grupo "${g}") e adicionado em Filmes.`);
+      setCtab('movie');
+    } else if (split && split.kind === 'series') {
+      const g = split.sub || 'Séries';
+      pushSeries({name, url, logo}, g);
+      serSel = state.series[state.series.length - 1].id;
+      flash(`"${name}" identificado como série (grupo "${g}") e adicionado em Séries, com o link como T1 E1.`);
+      setCtab('series');
+    } else {
+      addChannel({name, group, url, logo});
+      flash(group ? `"${name}" adicionado em ${group}.` : `"${name}" está em Canais inseridos, esperando um grupo.`);
+    }
+    resetForm();
+    $('fName').focus();
+  }
+  render();
+});
+$('fCancel').addEventListener('click', () => { resetForm(); render(); });
+
+/* ================= abas ================= */
+document.querySelectorAll('[role=tab][data-pane]').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('[role=tab][data-pane]').forEach(x => { x.setAttribute('aria-selected', x === t); $(x.dataset.pane).hidden = x !== t; });
+}));
+function setView(v){ view = v; $('vPend').setAttribute('aria-pressed', v === 'pend'); $('vAll').setAttribute('aria-pressed', v === 'all'); render(); }
+$('vPend').addEventListener('click', () => setView('pend'));
+$('vAll').addEventListener('click', () => setView('all'));
+$('applyAll').addEventListener('click', () => {
+  let n = 0;
+  state.channels.filter(c => !c.group).forEach(c => { const e = matchCatalog(c.name); if (e) { c.group = e.grupo; ensureGroup(e.grupo); n++; } });
+  render(); flash(`${n} canais colocados nos grupos do catálogo.`);
+});
+
+/* ================= lista em lote ================= */
+let lMap = {}, lTimer = null;
+const NOG = '\u0000sem';
+
+/* Reconhece grupos/subgrupos de Filmes e Séries no group-title da lista importada,
+   tipo "Filmes | Ação", "Séries: Netflix", "Ação | Filmes", ou só "Filmes"/"Séries". */
+const VOD_SEP = '[:\\-–—|/»›•·>]';
+const VOD_PREFIX_RE = new RegExp(`^\\s*(?:filmes?|movies?|vod)\\s*${VOD_SEP}\\s*(.+)$`, 'i');
+const SER_PREFIX_RE = new RegExp(`^\\s*(?:s[ée]ries?)\\s*${VOD_SEP}\\s*(.+)$`, 'i');
+const VOD_SUFFIX_RE = new RegExp(`^(.+?)\\s*${VOD_SEP}\\s*(?:filmes?|movies?|vod)\\s*$`, 'i');
+const SER_SUFFIX_RE = new RegExp(`^(.+?)\\s*${VOD_SEP}\\s*(?:s[ée]ries?)\\s*$`, 'i');
+const VOD_BARE_RE = /^\s*(?:filmes?|movies?|vod)\s*$/i;
+const SER_BARE_RE = /^\s*(?:s[ée]ries?)\s*$/i;
+function splitVodGroup(rawGroup){
+  const g = clean(rawGroup);
+  if (!g) return null;
+  let m = g.match(VOD_PREFIX_RE); if (m) return {kind: 'movie', sub: clean(m[1])};
+  m = g.match(SER_PREFIX_RE); if (m) return {kind: 'series', sub: clean(m[1])};
+  m = g.match(VOD_SUFFIX_RE); if (m) return {kind: 'movie', sub: clean(m[1])};
+  m = g.match(SER_SUFFIX_RE); if (m) return {kind: 'series', sub: clean(m[1])};
+  if (VOD_BARE_RE.test(g)) return {kind: 'movie', sub: ''};
+  if (SER_BARE_RE.test(g)) return {kind: 'series', sub: ''};
+  return null;
+}
+function parseLote(text){
+  if (/#EXTINF/i.test(text)) { const {items, skipped} = parseM3U(text); return {items, problems: skipped ? [`${skipped} entradas sem link serão ignoradas.`] : []}; }
+  const {items, errors} = parseBulk(text); return {items, problems: errors};
+}
+const loteKey = it => clean(it.group) || NOG;
+function renderLote(){
+  const {items, problems} = parseLote($('lText').value);
+  const mode = $('lMode').value, forced = mode === 'filmes' || mode === 'series';
+  const counts = new Map();
+  items.forEach(it => { const g = loteKey(it); counts.set(g, (counts.get(g) || 0) + 1); });
+  Object.keys(lMap).forEach(g => { if (!counts.has(g)) delete lMap[g]; });
+  const has = items.length > 0;
+  const recog = items.filter(it => matchCatalog(it.name)).length;
+  let movN = 0, serN = 0;
+  if (!forced) items.forEach(it => { const s = splitVodGroup(it.group); if (s) { if (s.kind === 'movie') movN++; else serN++; } });
+  $('lSummary').hidden = !has;
+  const bits = [`${items.length} canais lidos em ${counts.size} grupos`];
+  if (catIndex.length) bits.push(`${recog} reconhecidos pelo catálogo`);
+  if (movN) bits.push(`${movN} identificados como filmes`);
+  if (serN) bits.push(`${serN} identificados como séries`);
+  $('lSummary').textContent = has ? bits.join(' · ') + '.' : '';
+  $('lErr').textContent = problems.slice(0, 4).join(' ') + (problems.length > 4 ? ` (+${problems.length-4} linhas com problema)` : '');
+  if (!has && $('lText').value.trim() && !problems.length) $('lErr').textContent = 'Nenhum canal encontrado. Use uma lista M3U ou linhas Grupo | Nome | Link.';
+  $('lAllBox').hidden = !has;
+  $('lAdd').disabled = $('lReplace').disabled = !has;
+  const box = $('lGroups'); box.textContent = '';
+  const anyVod = !forced && items.some(it => splitVodGroup(it.group));
+  box.hidden = !has || (mode === 'inseridos' && !anyVod);
+  if (box.hidden) return;
+  const head = document.createElement('div'); head.className = 'lg-row lg-head';
+  head.innerHTML = '<span>Grupo na lista</span><span class="lg-n">Qtd</span><span>Novo nome</span>';
+  box.appendChild(head);
+  const body = document.createElement('div'); body.className = 'lg-body';
+  let k = 0;
+  counts.forEach((n, g) => {
+    const split = g === NOG ? null : splitVodGroup(g);
+    if (mode === 'inseridos' && !split) return;
+    const row = document.createElement('div'); row.className = 'lg-row' + (lMap[g] ? ' changed' : '');
+    const id = 'lg-' + (k++);
+    row.innerHTML = `<label class="lg-name" for="${id}"></label><span class="lg-n">${n}</span><input class="in" id="${id}" list="groupList" autocomplete="off">`;
+    const tag = !forced && split ? (split.kind === 'movie' ? ' → Filmes' : ' → Séries') : '';
+    row.querySelector('.lg-name').textContent = (g === NOG ? '(sem grupo)' : g) + tag;
+    const inp = row.querySelector('input');
+    if (forced) inp.placeholder = (split ? split.sub : (g === NOG ? '' : g)) || (mode === 'filmes' ? 'Filmes' : 'Séries');
+    else if (split) inp.placeholder = split.sub || (split.kind === 'movie' ? 'Filmes' : 'Séries');
+    else inp.placeholder = g === NOG ? 'Canais inseridos' : 'Manter';
+    inp.value = lMap[g] || '';
+    inp.addEventListener('input', () => { const v = clean(inp.value); if (v && v !== g) lMap[g] = v; else delete lMap[g]; row.classList.toggle('changed', !!lMap[g]); });
+    body.appendChild(row);
+  });
+  box.appendChild(body);
+}
+$('lText').addEventListener('input', () => { clearTimeout(lTimer); lTimer = setTimeout(renderLote, 250); });
+$('lMode').addEventListener('change', renderLote);
+$('lFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { $('lText').value = r.result; lMap = {}; renderLote(); flash(`Arquivo "${f.name}" carregado.`); };
+  r.readAsText(f, 'utf-8'); e.target.value = '';
+});
+$('lLoad').addEventListener('click', () => {
+  const lines = [];
+  state.groupOrder.concat(['']).forEach(g => state.channels.filter(c => c.group === g).forEach(c => {
+    const parts = [g, c.name, c.url];
+    if (c.logo || c.tvgId) parts.push(c.logo || '');
+    if (c.tvgId) parts.push(c.tvgId);
+    lines.push(parts.join(' | '));
+  }));
+  $('lText').value = lines.join('\n');
+  lMap = {}; $('lAll').value = ''; $('lMode').value = 'lista';
+  renderLote();
+  flash('Lista atual carregada na caixa. Ajuste os grupos e use "Substituir a lista".');
+});
+function vodDest(kind, rawGroup, k, all){
+  const split = splitVodGroup(rawGroup);
+  const sub = split ? split.sub : (k === NOG ? '' : k);
+  return all || lMap[k] || sub || (kind === 'movie' ? 'Filmes' : 'Séries');
+}
+function pushMovie(it, group){
+  state.movies.push({id: vid(), name: clean(it.name), group, url: it.url, logo: it.logo || '', year: '', plot: ''});
+  if (!state.movieGroups.includes(group)) state.movieGroups.push(group);
+}
+function pushSeries(it, group){
+  state.series.push({id: vid(), name: clean(it.name), group, logo: it.logo || '', plot: '', episodes: [{id: vid(), season: 1, ep: 1, title: '', url: it.url}]});
+  if (!state.seriesGroups.includes(group)) state.seriesGroups.push(group);
+}
+function applyLote(replace){
+  const {items} = parseLote($('lText').value);
+  if (!items.length) return;
+  const all = clean($('lAll').value), mode = $('lMode').value;
+  if (mode === 'filmes' || mode === 'series') {
+    const kind = mode === 'filmes' ? 'movie' : 'series';
+    if (replace) {
+      if (kind === 'movie') { state.movies = []; state.movieGroups = []; }
+      else { state.series = []; state.seriesGroups = []; serSel = null; epEdit = null; }
+    }
+    items.forEach(it => { const k = loteKey(it); const group = vodDest(kind, it.group, k, all); if (kind === 'movie') pushMovie(it, group); else pushSeries(it, group); });
+    $('lText').value = ''; $('lAll').value = ''; lMap = {};
+    renderLote(); setCtab(kind);
+    const n = items.length, subst = kind === 'movie' ? (n === 1 ? 'filme' : 'filmes') : (n === 1 ? 'série' : 'séries');
+    const verbo = kind === 'movie' ? (n === 1 ? 'adicionado' : 'adicionados') : (n === 1 ? 'adicionada' : 'adicionadas');
+    flash(`${n} ${subst} ${replace ? `na nova lista de ${kind === 'movie' ? 'filmes' : 'séries'}` : verbo}${kind === 'series' ? ' (cada uma com 1 episódio; complete os outros em "Episódios")' : ''}.`);
+    return;
+  }
+  if (replace) { state.channels = []; state.groupOrder = []; resetForm(); }
+  let recog = 0, chAdded = 0, movN = 0, serN = 0;
+  items.forEach(it => {
+    const k = loteKey(it);
+    const split = splitVodGroup(it.group);
+    if (split) {
+      const group = vodDest(split.kind, it.group, k, all);
+      if (split.kind === 'movie') { pushMovie(it, group); movN++; } else { pushSeries(it, group); serN++; }
+      return;
+    }
+    const listGroup = lMap[k] || (k === NOG ? '' : k);
+    let g;
+    if (all) g = all;
+    else if (mode === 'inseridos') g = '';
+    else if (mode === 'catalogo') { const e = matchCatalog(it.name); if (e) { g = e.grupo; recog++; } else g = listGroup; }
+    else g = listGroup;
+    addChannel(Object.assign({}, it, {group: g})); chAdded++;
+  });
+  $('lText').value = ''; $('lAll').value = ''; lMap = {};
+  renderLote(); render();
+  const pend = state.channels.filter(c => !c.group).length;
+  const bits = [];
+  if (chAdded) bits.push(`${chAdded} ${chAdded === 1 ? 'canal' : 'canais'}${recog ? `, ${recog} pelo catálogo` : ''}`);
+  if (movN) bits.push(`${movN} para Filmes`);
+  if (serN) bits.push(`${serN} para Séries`);
+  if (pend) bits.push(`${pend} em Canais inseridos`);
+  flash(`${items.length} itens lidos${replace ? ' (canais substituídos)' : ''}: ${bits.join(', ')}.`);
+}
+$('lAdd').addEventListener('click', () => applyLote(false));
+armButton($('lReplace'), 'Confirmar substituição', () => applyLote(true));
+
+/* ================= grupos ================= */
+$('newGroupBtn').addEventListener('click', () => { $('newGroupForm').hidden = false; $('ngName').focus(); });
+$('ngCancel').addEventListener('click', () => { $('newGroupForm').hidden = true; });
+$('newGroupForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const g = clean($('ngName').value);
+  if (!g) { $('ngName').focus(); return; }
+  const arr = ctab === 'movie' ? state.movieGroups : ctab === 'series' ? state.seriesGroups : state.groupOrder;
+  if (arr.includes(g)) { flash(`O grupo "${g}" já existe.`, true); return; }
+  arr.push(g); $('ngName').value = '';
+  render(); flash(`Grupo "${g}" criado em ${ctab === 'movie' ? 'Filmes' : ctab === 'series' ? 'Séries' : 'TV ao vivo'}. Arraste itens de Canais inseridos para ele.`);
+});
+$('ngStd').addEventListener('click', () => {
+  const std = []; catalog.forEach(e => { if (!std.includes(e.grupo)) std.push(e.grupo); });
+  if (!std.length) { flash('O catálogo ainda não carregou.', true); return; }
+  let n = 0; std.forEach(g => { if (!state.groupOrder.includes(g)) { state.groupOrder.push(g); n++; } });
+  render(); flash(n ? `${n} grupos criados a partir do catálogo.` : 'Todos os grupos do catálogo já existem.');
+});
+
+$('groups').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const act = btn.dataset.act;
+  if (act[0] === 'g') {
+    const g = btn.closest('.group').dataset.group, i = state.groupOrder.indexOf(g);
+    const visible = groupLists(true).map(x => x[0]); const vi = visible.indexOf(g);
+    if (act === 'gup' && vi > 0) { const j = state.groupOrder.indexOf(visible[vi-1]); state.groupOrder.splice(i, 1); state.groupOrder.splice(j, 0, g); render(); }
+    if (act === 'gdown' && vi < visible.length - 1) { const j = state.groupOrder.indexOf(visible[vi+1]); state.groupOrder.splice(i, 1); state.groupOrder.splice(j, 0, g); render(); }
+    if (act === 'grename') startRename(btn.closest('.group').querySelector('.g-name'), g);
+    if (act === 'gdel') {
+      if (!btn.classList.contains('armed')) {
+        btn.classList.add('armed'); btn.textContent = 'Confirmar';
+        setTimeout(() => { if (btn.isConnected) { btn.classList.remove('armed'); btn.textContent = 'Excluir'; } }, 4000);
+        return;
+      }
+      const n = state.channels.filter(c => c.group === g).length;
+      state.channels.forEach(c => { if (c.group === g) c.group = ''; });
+      state.groupOrder.splice(i, 1);
+      render(); flash(n ? `Grupo "${g}" excluído. ${n} canais voltaram para Canais inseridos.` : `Grupo "${g}" excluído.`);
+    }
+    return;
+  }
+  const id = btn.closest('.ch').dataset.id, c = byId(id); if (!c) return;
+  if (act === 'edit') startEdit(id);
+  if (act === 'fora') { c.fora = !c.fora; render(); flash(c.fora ? `"${c.name}" saiu da lista publicada. Rode o publicar.bat.` : `"${c.name}" voltou para a lista publicada. Rode o publicar.bat.`); }
+  if (act === 'del') deleteChannel(id);
+  if (act === 'up' || act === 'down') {
+    if (state.opts.sort) { flash('Desmarque "Canais em ordem A–Z" para mudar a ordem manualmente.', true); return; }
+    const same = state.channels.filter(x => x.group === c.group);
+    const k = same.indexOf(c), other = same[act === 'up' ? k - 1 : k + 1];
+    if (!other) return;
+    const a = state.channels.indexOf(c), b = state.channels.indexOf(other);
+    [state.channels[a], state.channels[b]] = [state.channels[b], state.channels[a]];
+    render();
+  }
+});
+function startRename(slot, g){
+  const inp = document.createElement('input'); inp.value = g; inp.setAttribute('aria-label', 'Novo nome do grupo');
+  slot.textContent = ''; slot.appendChild(inp); inp.focus(); inp.select();
+  let done = false;
+  const finish = ok => {
+    if (done) return; done = true;
+    const nv = clean(inp.value);
+    if (ok && nv && nv !== g) {
+      const exists = state.groupOrder.includes(nv);
+      state.channels.forEach(c => { if (c.group === g) c.group = nv; });
+      const i = state.groupOrder.indexOf(g);
+      if (exists) state.groupOrder.splice(i, 1); else state.groupOrder[i] = nv;
+      flash(exists ? `Grupo "${g}" juntado com "${nv}".` : `Grupo renomeado para "${nv}".`);
+    }
+    render();
+  };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') finish(true); if (e.key === 'Escape') finish(false); });
+  inp.addEventListener('blur', () => finish(true));
+}
+$('q').addEventListener('input', e => { filter = e.target.value.trim(); render(); });
+armButton($('clearAll'), 'Confirmar: apagar tudo', () => {
+  if (ctab === 'movie') { state.movies = []; state.movieGroups = []; vodEdit = null; render(); flash('Filmes apagados.'); return; }
+  if (ctab === 'series') { state.series = []; state.seriesGroups = []; serSel = null; vodEdit = null; render(); flash('Séries apagadas.'); return; }
+  state.channels = []; state.groupOrder = []; resetForm(); render(); flash('Canais apagados.');
+});
+
+/* ================= arrastar ================= */
+let dragId = null, dragKind = null, tabTimer = null;
+const DROPS = {channel: ['inbox','group','mgroup','mlist','sgroup','srow','slist','tab'], movie: ['mgroup','mlist'], series: ['sgroup','slist']};
+document.addEventListener('dragstart', e => {
+  const el = e.target.closest && e.target.closest('.card, .ch, .vitem[draggable="true"]'); if (!el) return;
+  dragId = el.dataset.id; dragKind = el.dataset.kind || 'channel'; el.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', dragId); } catch(_) {}
+});
+function clearDrag(){
+  dragId = null; dragKind = null; clearTimeout(tabTimer);
+  document.querySelectorAll('.dragging, .drop-over, .drop-before').forEach(x => x.classList.remove('dragging', 'drop-over', 'drop-before'));
+}
+document.addEventListener('dragend', clearDrag);
+function dropTarget(e){
+  if (!e.target.closest) return null;
+  const tab = e.target.closest('[data-ctab]');
+  if (tab) return DROPS[dragKind].includes('tab') ? tab : null;
+  let t = e.target.closest('[data-drop]');
+  while (t && !DROPS[dragKind].includes(t.dataset.drop)) t = t.parentElement && t.parentElement.closest('[data-drop]');
+  return t;
+}
+document.addEventListener('dragover', e => {
+  if (!dragId) return;
+  const t = dropTarget(e); if (!t) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.drop-over').forEach(x => { if (x !== t) x.classList.remove('drop-over'); });
+  t.classList.add('drop-over');
+  if (t.dataset.ctab && t.dataset.ctab !== ctab && !tabTimer) tabTimer = setTimeout(() => { tabTimer = null; if (dragId) setCtab(t.dataset.ctab); }, 450);
+  if (!t.dataset.ctab) { clearTimeout(tabTimer); tabTimer = null; }
+  document.querySelectorAll('.drop-before').forEach(x => x.classList.remove('drop-before'));
+  const row = e.target.closest('.ch');
+  if (row && t.dataset.drop === 'group' && row.dataset.id !== dragId) {
+    const r = row.getBoundingClientRect();
+    if (e.clientY < r.top + r.height / 2) row.classList.add('drop-before');
+    else if (row.nextElementSibling && row.nextElementSibling.classList.contains('ch')) row.nextElementSibling.classList.add('drop-before');
+  }
+});
+document.addEventListener('drop', e => {
+  if (!dragId) return;
+  const t = dropTarget(e); if (!t) return;
+  e.preventDefault();
+  const before = t.querySelector('.drop-before');
+  const id = dragId, kind = dragKind; clearDrag();
+  const d = t.dataset.ctab ? 'tab:' + t.dataset.ctab : t.dataset.drop;
+  if (t.dataset.ctab && t.dataset.ctab !== ctab) setCtab(t.dataset.ctab);
+  if (kind === 'movie') { const m = state.movies.find(x => x.id === id); if (m) { m.group = t.dataset.g || firstGroup('movie'); render(); flash(`"${m.name}" movido para ${m.group}.`); } return; }
+  if (kind === 'series') { const s = state.series.find(x => x.id === id); if (s) { s.group = t.dataset.g || firstGroup('series'); render(); flash(`"${s.name}" movida para ${s.group}.`); } return; }
+  if (d === 'inbox') moveChannel(id, '', null);
+  else if (d === 'group') moveChannel(id, t.dataset.group, before ? before.dataset.id : null);
+  else if (d === 'mgroup' || d === 'mlist' || d === 'tab:movie') channelToMovie(id, t.dataset.g || firstGroup('movie'));
+  else if (d === 'srow') channelToEpisode(id, t.dataset.id);
+  else if (d === 'sgroup' || d === 'slist' || d === 'tab:series') channelToSeries(id, t.dataset.g || firstGroup('series'));
+  else if (d === 'tab:live') { const c = byId(id); if (c && !c.group) moveChannel(id, state.groupOrder[0] || 'TV Aberta', null); }
+});
+function firstGroup(kind){ const g = vodGroups(kind); return g[0] || (kind === 'movie' ? 'Filmes' : 'Séries'); }
+function takeChannel(id){ const c = byId(id); if (!c) return null; const at = state.channels.indexOf(c); state.channels.splice(at, 1); if (editingId === id) resetForm(); return {c, at}; }
+function undoTake(t, fn){ return () => { fn(); state.channels.splice(t.at, 0, t.c); render(); }; }
+function channelToMovie(id, group){
+  const t = takeChannel(id); if (!t) return;
+  const m = {id: vid(), name: t.c.name, group, url: t.c.url, logo: t.c.logo || '', year: '', plot: ''};
+  state.movies.push(m); if (!state.movieGroups.includes(group)) state.movieGroups.push(group);
+  render();
+  showToast(`"${m.name}" virou filme em ${group}.`, 'Desfazer', undoTake(t, () => { state.movies = state.movies.filter(x => x !== m); }));
+}
+function channelToSeries(id, group){
+  const t = takeChannel(id); if (!t) return;
+  const s = {id: vid(), name: t.c.name, group, logo: t.c.logo || '', plot: '', episodes: [{id: vid(), season: 1, ep: 1, title: '', url: t.c.url}]};
+  state.series.push(s); if (!state.seriesGroups.includes(group)) state.seriesGroups.push(group);
+  serSel = s.id; render();
+  showToast(`"${s.name}" virou série em ${group}, com o link como T1 E1.`, 'Desfazer', undoTake(t, () => { state.series = state.series.filter(x => x !== s); if (serSel === s.id) serSel = null; }));
+}
+function channelToEpisode(id, seriesId){
+  const s = state.series.find(x => x.id === seriesId); if (!s) return;
+  const t = takeChannel(id); if (!t) return;
+  const season = s.episodes.reduce((mx, x) => Math.max(mx, x.season), 1);
+  const ep = s.episodes.filter(x => x.season === season).reduce((mx, x) => Math.max(mx, x.ep), 0) + 1;
+  const e = {id: vid(), season, ep, title: t.c.name, url: t.c.url};
+  s.episodes.push(e); serSel = s.id; render();
+  showToast(`"${t.c.name}" virou o episódio T${season} E${ep} de "${s.name}".`, 'Desfazer', undoTake(t, () => { s.episodes = s.episodes.filter(x => x !== e); }));
+}
+
+/* ================= catálogo (banco de dados) ================= */
+let catEditing = null;
+function setDbState(on, txt){ const s = $('dbState'); s.classList.toggle('on', on === true); s.classList.toggle('off', on === false); $('dbStateTxt').textContent = txt; }
+async function saveCatalog(entry, oldId){
+  if (!db) { flash('O catálogo não está disponível aqui.', true); return false; }
+  const nome = clean(entry.nome), grupo = clean(entry.grupo);
+  if (!nome || !grupo) { $('cErr').textContent = 'Preencha nome e grupo.'; return false; }
+  const id = slug(nome);
+  const data = {nome, grupo, tipo: entry.tipo === 'aberta' ? 'aberta' : 'fechada', apelidos: (entry.apelidos || []).map(clean).filter(Boolean)};
+  try {
+    await db.collection('catalogo').doc(id).set(data);
+    if (oldId && oldId !== id) await db.collection('catalogo').doc(oldId).delete();
+    flash(`"${nome}" salvo no catálogo em ${grupo}.`);
+    return true;
+  } catch(err) {
+    flash(err && err.code === 'quota_exceeded' ? 'O catálogo está cheio. Exclua canais que não usa.' : 'Não foi possível salvar no catálogo.', true);
+    return false;
+  }
+}
+function renderCatalog(){
+  $('catCount').textContent = catalog.length ? String(catalog.length) : '';
+  const groups = []; catalog.forEach(e => { if (!groups.includes(e.grupo)) groups.push(e.grupo); });
+  const cfg = $('cfg'), cur = cfg.value;
+  cfg.textContent = ''; const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Todos os grupos'; cfg.appendChild(o0);
+  groups.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = `${g} (${catalog.filter(e => e.grupo === g).length})`; cfg.appendChild(o); });
+  cfg.value = groups.includes(cur) ? cur : '';
+  const dl = $('catGroupList'); dl.textContent = ''; groups.forEach(g => { const o = document.createElement('option'); o.value = g; dl.appendChild(o); });
+
+  const q = norm($('cq').value), gf = cfg.value;
+  const body = $('catBody'); body.textContent = '';
+  const rows = catalog.filter(e => (!gf || e.grupo === gf) && (!q || norm(e.nome).includes(q) || (e.apelidos || []).some(a => norm(a).includes(q))))
+    .sort((a, b) => a.grupo.localeCompare(b.grupo, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR', {numeric:true}));
+  rows.forEach(e => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td></td><td></td><td></td><td class="al"></td><td style="white-space:nowrap"><button class="icon" type="button" data-cact="edit">Editar</button><button class="icon del" type="button" data-cact="del">Excluir</button></td>`;
+    tr.children[0].textContent = e.nome;
+    tr.children[1].textContent = e.grupo;
+    tr.children[2].appendChild(chip(tipoLabel(e.tipo), e.tipo));
+    tr.children[3].textContent = (e.apelidos || []).join(', ');
+    tr.dataset.id = e.id;
+    body.appendChild(tr);
+  });
+  if (!rows.length) {
+    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 5; td.className = 'empty';
+    td.textContent = dbOn ? (catalog.length ? 'Nada encontrado.' : 'O catálogo está vazio.') : 'O catálogo não está disponível nesta visualização.';
+    tr.appendChild(td); body.appendChild(tr);
+  }
+  $('cSave').disabled = !dbOn;
+}
+$('cq').addEventListener('input', renderCatalog);
+$('cfg').addEventListener('change', renderCatalog);
+function resetCatForm(){ catEditing = null; ['cNome','cGrupo','cApel'].forEach(id => $(id).value = ''); $('cTipo').value = 'fechada'; $('cCancel').hidden = true; $('cSave').textContent = 'Salvar'; $('cErr').textContent = ''; }
+$('cCancel').addEventListener('click', resetCatForm);
+$('catForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('cErr').textContent = '';
+  const ok = await saveCatalog({nome: $('cNome').value, grupo: $('cGrupo').value, tipo: $('cTipo').value, apelidos: $('cApel').value.split(',')}, catEditing);
+  if (ok) resetCatForm();
+});
+$('catBody').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-cact]'); if (!b) return;
+  const id = b.closest('tr').dataset.id, entry = catalog.find(x => x.id === id); if (!entry) return;
+  if (b.dataset.cact === 'edit') {
+    catEditing = id;
+    $('cNome').value = entry.nome; $('cGrupo').value = entry.grupo; $('cTipo').value = entry.tipo || 'fechada'; $('cApel').value = (entry.apelidos || []).join(', ');
+    $('cCancel').hidden = false; $('cSave').textContent = 'Salvar alterações';
+    $('cNome').focus(); $('cNome').scrollIntoView({block:'center', behavior: reduceMotion ? 'auto' : 'smooth'});
+  }
+  if (b.dataset.cact === 'del') {
+    if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Confirmar'; setTimeout(() => { if (b.isConnected) { b.classList.remove('armed'); b.textContent = 'Excluir'; } }, 4000); return; }
+    try { await db.collection('catalogo').doc(id).delete(); flash(`"${entry.nome}" removido do catálogo.`); }
+    catch(err) { flash('Não foi possível remover do catálogo.', true); }
+  }
+});
+const CATALOGO_PADRAO = [{"id": "globo", "nome": "Globo", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["rede globo", "tv globo", "globo sp", "globo rj", "globo hd", "globo minas", "eptv", "rbs tv", "tv bahia", "tv anhanguera", "nsc tv", "tv tem", "tv vanguarda", "inter tv", "tv integracao", "tv mirante", "tv verdes mares", "tv gazeta es", "tv tribuna", "tv liberal", "tv amazonica", "tv clube pe", "tv globo nordeste"]}, {"id": "sbt", "nome": "SBT", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["sbt sp", "sbt rj", "sbt hd", "sbt rs", "sbt pb", "sbt pi", "sbt caruaru", "tv tambau", "tv alterosa", "tv jornal", "tv cidade verde"]}, {"id": "record", "nome": "Record", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["record tv", "rede record", "tv record", "record sp", "record rj", "record hd", "record pb", "tv vitoria record", "tv itapoan"]}, {"id": "band", "nome": "Band", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["rede bandeirantes", "tv bandeirantes", "band sp", "band rj", "band hd", "band para", "band minas", "band rs"]}, {"id": "redetv", "nome": "RedeTV!", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["redetv", "rede tv", "redetv hd", "rede tv pr"]}, {"id": "tv-cultura", "nome": "TV Cultura", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["cultura", "tv cultura sp", "tv cultura hd"]}, {"id": "tv-brasil", "nome": "TV Brasil", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["tv brasil hd", "ebc"]}, {"id": "tv-gazeta", "nome": "TV Gazeta", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["gazeta", "tv gazeta sp"]}, {"id": "cnt", "nome": "CNT", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["rede cnt"]}, {"id": "rede-brasil", "nome": "Rede Brasil", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["rede brasil de televisao", "rbtv"]}, {"id": "rede-meio-norte", "nome": "Rede Meio Norte", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["meio norte", "tv meio norte"]}, {"id": "tv-diario", "nome": "TV Diário", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["tv diario"]}, {"id": "amazon-sat", "nome": "Amazon Sat", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["amazonsat"]}, {"id": "rede-familia", "nome": "Rede Família", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": ["rede familia", "familia"]}, {"id": "canal-21", "nome": "Canal 21", "grupo": "TV Aberta", "tipo": "aberta", "apelidos": []}, {"id": "globonews", "nome": "GloboNews", "grupo": "Notícias", "tipo": "fechada", "apelidos": ["globo news"]}, {"id": "cnn-brasil", "nome": "CNN Brasil", "grupo": "Notícias", "tipo": "fechada", "apelidos": ["cnn"]}, {"id": "bandnews-tv", "nome": "BandNews TV", "grupo": "Notícias", "tipo": "fechada", "apelidos": ["band news", "bandnews"]}, {"id": "record-news", "nome": "Record News", "grupo": "Notícias", "tipo": "aberta", "apelidos": ["recordnews"]}, {"id": "jovem-pan-news", "nome": "Jovem Pan News", "grupo": "Notícias", "tipo": "fechada", "apelidos": ["jovem pan", "jp news"]}, {"id": "sbt-news", "nome": "SBT News", "grupo": "Notícias", "tipo": "fechada", "apelidos": []}, {"id": "times-brasil", "nome": "Times Brasil", "grupo": "Notícias", "tipo": "fechada", "apelidos": ["cnbc brasil", "times brasil cnbc"]}, {"id": "cnn-international", "nome": "CNN International", "grupo": "Notícias", "tipo": "fechada", "apelidos": []}, {"id": "sportv", "nome": "SporTV", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["sport tv"]}, {"id": "sportv-2", "nome": "SporTV 2", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["sport tv 2"]}, {"id": "sportv-3", "nome": "SporTV 3", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["sport tv 3"]}, {"id": "espn", "nome": "ESPN", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["espn brasil", "espn br", "espn hd"]}, {"id": "espn-2", "nome": "ESPN 2", "grupo": "Esportes", "tipo": "fechada", "apelidos": []}, {"id": "espn-3", "nome": "ESPN 3", "grupo": "Esportes", "tipo": "fechada", "apelidos": []}, {"id": "espn-4", "nome": "ESPN 4", "grupo": "Esportes", "tipo": "fechada", "apelidos": []}, {"id": "espn-5", "nome": "ESPN 5", "grupo": "Esportes", "tipo": "fechada", "apelidos": []}, {"id": "espn-6", "nome": "ESPN 6", "grupo": "Esportes", "tipo": "fechada", "apelidos": []}, {"id": "premiere", "nome": "Premiere", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["premiere fc", "premiere clubes", "pfc", "premiere hd"]}, {"id": "combate", "nome": "Combate", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["canal combate"]}, {"id": "bandsports", "nome": "BandSports", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["band sports", "band sport"]}, {"id": "tnt-sports", "nome": "TNT Sports", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["esporte interativo", "ei", "ei maxx", "ei max"]}, {"id": "fox-sports", "nome": "Fox Sports", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["fox sports 2", "fox sport"]}, {"id": "canal-off", "nome": "Canal Off", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["off"]}, {"id": "xsports", "nome": "Xsports", "grupo": "Esportes", "tipo": "fechada", "apelidos": ["x sports"]}, {"id": "a-e", "nome": "A&E", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["a e", "ae", "a and e"]}, {"id": "axn", "nome": "AXN", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "amc", "nome": "AMC", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "cinemax", "nome": "Cinemax", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo", "nome": "HBO", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo-2", "nome": "HBO 2", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo-plus", "nome": "HBO Plus", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["hbo +"]}, {"id": "hbo-family", "nome": "HBO Family", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo-signature", "nome": "HBO Signature", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo-mundi", "nome": "HBO Mundi", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo-pop", "nome": "HBO Pop", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "hbo-xtreme", "nome": "HBO Xtreme", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "telecine-premium", "nome": "Telecine Premium", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["telecine"]}, {"id": "telecine-action", "nome": "Telecine Action", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["tc action"]}, {"id": "telecine-touch", "nome": "Telecine Touch", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["tc touch"]}, {"id": "telecine-fun", "nome": "Telecine Fun", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["tc fun"]}, {"id": "telecine-pipoca", "nome": "Telecine Pipoca", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["tc pipoca"]}, {"id": "telecine-cult", "nome": "Telecine Cult", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["tc cult"]}, {"id": "megapix", "nome": "Megapix", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["mega pix"]}, {"id": "universal-tv", "nome": "Universal TV", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["universal", "universal channel"]}, {"id": "studio-universal", "nome": "Studio Universal", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "syfy", "nome": "SyFy", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["sy fy"]}, {"id": "warner-channel", "nome": "Warner Channel", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["warner", "warner tv"]}, {"id": "tnt", "nome": "TNT", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "tnt-series", "nome": "TNT Séries", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["tnt series"]}, {"id": "tnt-novelas", "nome": "TNT Novelas", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "space", "nome": "Space", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["canal space"]}, {"id": "sony-channel", "nome": "Sony Channel", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["sony"]}, {"id": "canal-brasil", "nome": "Canal Brasil", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "fx", "nome": "FX", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": []}, {"id": "star-channel", "nome": "Star Channel", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["star"]}, {"id": "paramount-network", "nome": "Paramount Network", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["paramount", "paramount channel"]}, {"id": "film-arts", "nome": "Film&Arts", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["film arts", "film e arts"]}, {"id": "prime-box-brazil", "nome": "Prime Box Brazil", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["prime box"]}, {"id": "curta", "nome": "Curta!", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["curta"]}, {"id": "cine-brasil-tv", "nome": "Cine Brasil TV", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["cine brasil"]}, {"id": "fox", "nome": "Fox", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["fox channel"]}, {"id": "fox-premium", "nome": "Fox Premium", "grupo": "Filmes e Séries", "tipo": "fechada", "apelidos": ["fox premium 1", "fox premium 2"]}, {"id": "cartoon-network", "nome": "Cartoon Network", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["cartoon"]}, {"id": "cartoonito", "nome": "Cartoonito", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "discovery-kids", "nome": "Discovery Kids", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "disney-channel", "nome": "Disney Channel", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["disney"]}, {"id": "disney-junior", "nome": "Disney Junior", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["disney jr"]}, {"id": "disney-xd", "nome": "Disney XD", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "nickelodeon", "nome": "Nickelodeon", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["nick"]}, {"id": "nick-jr", "nome": "Nick Jr.", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["nick jr", "nick junior"]}, {"id": "gloob", "nome": "Gloob", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "gloobinho", "nome": "Gloobinho", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "tooncast", "nome": "Tooncast", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "boomerang", "nome": "Boomerang", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "tv-ra-tim-bum", "nome": "TV Rá-Tim-Bum", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["tv ra tim bum", "ra tim bum"]}, {"id": "baby-tv", "nome": "Baby TV", "grupo": "Infantil", "tipo": "fechada", "apelidos": ["babytv"]}, {"id": "zoomoo", "nome": "Zoomoo", "grupo": "Infantil", "tipo": "fechada", "apelidos": []}, {"id": "discovery-channel", "nome": "Discovery Channel", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["discovery"]}, {"id": "discovery-turbo", "nome": "Discovery Turbo", "grupo": "Documentários", "tipo": "fechada", "apelidos": []}, {"id": "discovery-science", "nome": "Discovery Science", "grupo": "Documentários", "tipo": "fechada", "apelidos": []}, {"id": "discovery-world", "nome": "Discovery World", "grupo": "Documentários", "tipo": "fechada", "apelidos": []}, {"id": "discovery-theater", "nome": "Discovery Theater", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["discovery theater hd"]}, {"id": "animal-planet", "nome": "Animal Planet", "grupo": "Documentários", "tipo": "fechada", "apelidos": []}, {"id": "history", "nome": "History", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["history channel", "the history channel"]}, {"id": "history-2", "nome": "History 2", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["h2"]}, {"id": "national-geographic", "nome": "National Geographic", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["nat geo", "natgeo", "national geographic channel"]}, {"id": "nat-geo-wild", "nome": "Nat Geo Wild", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["natgeo wild"]}, {"id": "investigacao-discovery", "nome": "Investigação Discovery", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["investigation discovery", "id", "id discovery"]}, {"id": "smithsonian-channel", "nome": "Smithsonian Channel", "grupo": "Documentários", "tipo": "fechada", "apelidos": ["smithsonian"]}, {"id": "gnt", "nome": "GNT", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "multishow", "nome": "Multishow", "grupo": "Variedades", "tipo": "fechada", "apelidos": ["multi show"]}, {"id": "viva", "nome": "Viva", "grupo": "Variedades", "tipo": "fechada", "apelidos": ["canal viva"]}, {"id": "discovery-home-health", "nome": "Discovery Home & Health", "grupo": "Variedades", "tipo": "fechada", "apelidos": ["discovery h h", "home health", "discovery home health", "dhh"]}, {"id": "tlc", "nome": "TLC", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "e", "nome": "E!", "grupo": "Variedades", "tipo": "fechada", "apelidos": ["e entertainment", "e entertainment television"]}, {"id": "food-network", "nome": "Food Network", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "lifetime", "nome": "Lifetime", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "comedy-central", "nome": "Comedy Central", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "arte-1", "nome": "Arte 1", "grupo": "Variedades", "tipo": "fechada", "apelidos": ["arte1"]}, {"id": "modo-viagem", "nome": "Modo Viagem", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "travel-box-brazil", "nome": "Travel Box Brazil", "grupo": "Variedades", "tipo": "fechada", "apelidos": ["travel box"]}, {"id": "woohoo", "nome": "Woohoo", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "hgtv", "nome": "HGTV", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "mais-na-tela", "nome": "Mais na Tela", "grupo": "Variedades", "tipo": "fechada", "apelidos": []}, {"id": "mtv", "nome": "MTV", "grupo": "Música", "tipo": "fechada", "apelidos": ["mtv brasil", "mtv hd"]}, {"id": "mtv-00s", "nome": "MTV 00s", "grupo": "Música", "tipo": "fechada", "apelidos": ["mtv 00"]}, {"id": "mtv-live", "nome": "MTV Live", "grupo": "Música", "tipo": "fechada", "apelidos": []}, {"id": "bis", "nome": "Bis", "grupo": "Música", "tipo": "fechada", "apelidos": ["canal bis"]}, {"id": "music-box-brazil", "nome": "Music Box Brazil", "grupo": "Música", "tipo": "fechada", "apelidos": ["music box"]}, {"id": "trace-brazuca", "nome": "Trace Brazuca", "grupo": "Música", "tipo": "fechada", "apelidos": ["trace"]}, {"id": "vh1", "nome": "VH1", "grupo": "Música", "tipo": "fechada", "apelidos": ["vh1 mega hits"]}, {"id": "cancao-nova", "nome": "Canção Nova", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["cancao nova", "tv cancao nova"]}, {"id": "rede-vida", "nome": "Rede Vida", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["tv rede vida"]}, {"id": "tv-aparecida", "nome": "TV Aparecida", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["aparecida"]}, {"id": "rede-gospel", "nome": "Rede Gospel", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["gospel"]}, {"id": "rit", "nome": "RIT", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["rit tv", "rede internacional de televisao"]}, {"id": "rede-seculo-21", "nome": "Rede Século 21", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["rede seculo 21", "seculo 21", "tv seculo 21"]}, {"id": "tv-evangelizar", "nome": "TV Evangelizar", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["evangelizar", "tv evangeliza"]}, {"id": "boa-vontade-tv", "nome": "Boa Vontade TV", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["boa vontade", "tv boa vontade"]}, {"id": "tv-novo-tempo", "nome": "TV Novo Tempo", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["novo tempo"]}, {"id": "tv-universal", "nome": "TV Universal", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["iurd tv"]}, {"id": "rede-super", "nome": "Rede Super", "grupo": "Religiosos", "tipo": "aberta", "apelidos": []}, {"id": "tv-pai-eterno", "nome": "TV Pai Eterno", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["pai eterno"]}, {"id": "tv-nazare", "nome": "TV Nazaré", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["tv nazare"]}, {"id": "rede-mundial", "nome": "Rede Mundial", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["tv mundial"]}, {"id": "fonte-tv", "nome": "Fonte TV", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["fonte"]}, {"id": "impd-tv", "nome": "IMPD TV", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["impd"]}, {"id": "tv-terceiro-anjo", "nome": "TV Terceiro Anjo", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["terceiro anjo"]}, {"id": "tv-horizonte", "nome": "TV Horizonte", "grupo": "Religiosos", "tipo": "aberta", "apelidos": []}, {"id": "tv-imaculada", "nome": "TV Imaculada", "grupo": "Religiosos", "tipo": "aberta", "apelidos": []}, {"id": "tv-alvorada-espirita", "nome": "TV Alvorada Espírita", "grupo": "Religiosos", "tipo": "aberta", "apelidos": ["tv alvorada espirita"]}, {"id": "feb-tv", "nome": "FEB TV", "grupo": "Religiosos", "tipo": "aberta", "apelidos": []}, {"id": "tv-camara", "nome": "TV Câmara", "grupo": "Públicos", "tipo": "aberta", "apelidos": ["tv camara", "camara"]}, {"id": "tv-senado", "nome": "TV Senado", "grupo": "Públicos", "tipo": "aberta", "apelidos": ["senado"]}, {"id": "tv-justica", "nome": "TV Justiça", "grupo": "Públicos", "tipo": "aberta", "apelidos": ["tv justica"]}, {"id": "canal-gov", "nome": "Canal Gov", "grupo": "Públicos", "tipo": "aberta", "apelidos": ["nbr", "tv nbr"]}, {"id": "tv-escola", "nome": "TV Escola", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["tv escola hd"]}, {"id": "canal-futura", "nome": "Canal Futura", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["futura", "tv futura"]}, {"id": "rede-minas", "nome": "Rede Minas", "grupo": "Educativos", "tipo": "aberta", "apelidos": []}, {"id": "tve-rs", "nome": "TVE RS", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["tve rio grande do sul"]}, {"id": "tve-bahia", "nome": "TVE Bahia", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["tve ba"]}, {"id": "canal-saude", "nome": "Canal Saúde", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["canal saude"]}, {"id": "tv-parana-turismo", "nome": "TV Paraná Turismo", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["e parana", "tv parana"]}, {"id": "tv-ufg", "nome": "TV UFG", "grupo": "Educativos", "tipo": "aberta", "apelidos": []}, {"id": "tv-aperipe", "nome": "TV Aperipê", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["tv aperipe"]}, {"id": "tv-brasil-central", "nome": "TV Brasil Central", "grupo": "Educativos", "tipo": "aberta", "apelidos": []}, {"id": "univesp-tv", "nome": "Univesp TV", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["univesp"]}, {"id": "tv-universitaria", "nome": "TV Universitária", "grupo": "Educativos", "tipo": "aberta", "apelidos": ["tv universitaria", "tvu"]}, {"id": "canal-rural", "nome": "Canal Rural", "grupo": "Agro", "tipo": "fechada", "apelidos": []}, {"id": "terraviva", "nome": "Terraviva", "grupo": "Agro", "tipo": "fechada", "apelidos": ["terra viva"]}, {"id": "canal-do-boi", "nome": "Canal do Boi", "grupo": "Agro", "tipo": "fechada", "apelidos": []}, {"id": "agromais", "nome": "AgroMais", "grupo": "Agro", "tipo": "fechada", "apelidos": ["agro mais"]}, {"id": "agro-canal", "nome": "Agro Canal", "grupo": "Agro", "tipo": "fechada", "apelidos": ["agrocanal"]}, {"id": "agro-brasil-tv", "nome": "Agro Brasil TV", "grupo": "Agro", "tipo": "fechada", "apelidos": ["agro brasil"]}, {"id": "shoptime", "nome": "Shoptime", "grupo": "Compras", "tipo": "fechada", "apelidos": ["shop time"]}, {"id": "polishop-tv", "nome": "Polishop TV", "grupo": "Compras", "tipo": "aberta", "apelidos": ["polishop"]}];
+const KEYC = 'montador-catalogo-v1';
+async function setupDb(){
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(KEYC) || 'null'); } catch(e) {}
+  catalog = Array.isArray(local) ? local : CATALOGO_PADRAO.map(e => Object.assign({}, e));
+  const persist = () => { try { localStorage.setItem(KEYC, JSON.stringify(catalog)); } catch(e) {} };
+  const refresh = () => { dbOn = true; rebuildIndex(); setDbState(true, 'Catálogo salvo neste navegador'); renderCatalog(); updateSuggest(); renderLote(); render(); };
+  db = { collection: () => ({ doc: id => ({
+    set: async d => { const e = Object.assign({id}, d); const i = catalog.findIndex(x => x.id === id); if (i >= 0) catalog[i] = e; else catalog.push(e); persist(); refresh(); },
+    delete: async () => { catalog = catalog.filter(x => x.id !== id); persist(); refresh(); }
+  }) }) };
+  refresh();
+}
+
+
+/* ================= toast / status ================= */
+let toastTimer = null, toastFn = null;
+function showToast(msg, label, fn){
+  $('toastMsg').textContent = msg; $('toastBtn').textContent = label; toastFn = fn; $('toast').hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; toastFn = null; }, 7000);
+}
+$('toastBtn').addEventListener('click', () => { const f = toastFn; toastFn = null; $('toast').hidden = true; if (f) f(); });
+let statusTimer = null;
+function flash(msg, bad){ const s = $('status'); s.textContent = msg; s.classList.toggle('bad', !!bad); clearTimeout(statusTimer); statusTimer = setTimeout(() => s.textContent = '', 6000); }
+function armButton(b, armedLabel, fn){
+  const label = b.textContent; let t = null;
+  b.addEventListener('click', () => {
+    if (!t) { b.textContent = armedLabel; b.classList.add('armed'); t = setTimeout(() => { t = null; b.textContent = label; b.classList.remove('armed'); }, 4000); return; }
+    clearTimeout(t); t = null; b.textContent = label; b.classList.remove('armed'); fn();
+  });
+}
+
+/* ================= saída ================= */
+function bindOpt(id, key, prop){ const el = $(id); el[prop] = state.opts[key]; el.addEventListener(prop === 'checked' ? 'change' : 'input', () => { state.opts[key] = el[prop]; render(); }); }
+$('copy').addEventListener('click', () => {
+  const fallback = () => { const sel = window.getSelection(), range = document.createRange(); range.selectNodeContents($('out')); sel.removeAllRanges(); sel.addRange(range); flash('Não consegui copiar sozinho. A lista está selecionada: use Ctrl+C (ou Copiar no celular).', true); };
+  try { navigator.clipboard.writeText($('outRaw').value).then(() => flash('Lista copiada. Cole no arquivo lista.m3u8.'), fallback); } catch(e) { fallback(); }
+});
+const HEADERS = `/*.m3u8
+  Content-Type: application/vnd.apple.mpegurl
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
+
+/*.m3u
+  Content-Type: audio/x-mpegurl; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
+`;
+const REDIRECTS = `/lista.m3u   /lista.m3u8   200
+/playlist.m3u   /lista.m3u8   200
+`;
+const INDEX = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lista IPTV</title>
+<style>body{font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;background:#111;color:#eee}
+code{display:block;background:#222;padding:12px;border-radius:8px;word-break:break-all;margin:8px 0}
+button{padding:10px 16px;border:0;border-radius:8px;background:#2d7ff9;color:#fff;font-size:16px;margin-bottom:20px}
+small{color:#999}</style></head>
+<body><h1>Lista IPTV</h1><p>Cole um destes endereços no app (opção <b>M3U URL</b>):</p>
+<code id="a"></code><button data-t="a">Copiar .m3u8</button>
+<code id="b"></code><button data-t="b">Copiar .m3u</button>
+<p><small id="n">Verificando lista…</small></p>
+<script>
+const o=location.origin;a.textContent=o+'/lista.m3u8';b.textContent=o+'/lista.m3u';
+document.querySelectorAll('button').forEach(x=>x.onclick=()=>{navigator.clipboard.writeText(document.getElementById(x.dataset.t).textContent);x.textContent='Copiado!'});
+fetch('/lista.m3u8').then(r=>r.text()).then(t=>{const c=(t.match(/^#EXTINF/gm)||[]).length;
+n.textContent=t.trim().startsWith('#EXTM3U')?c+' canais na lista.':'Atenção: a lista precisa começar com #EXTM3U.'}).catch(()=>n.textContent='Não foi possível ler a lista.');
+<\/script></body></html>
+`;
+const README = `COMO PUBLICAR
+1. Extraia este ZIP.
+2. Acesse app.netlify.com/drop e arraste a pasta lista-iptv-netlify.
+3. No XCIPTV, escolha M3U URL e use:
+   https://SEU-SITE.netlify.app/lista.m3u8
+   (o endereço /lista.m3u também funciona)
+
+PARA ATUALIZAR
+Monte a lista de novo no montador, baixe outro ZIP e, no Netlify,
+em Deploys, arraste a pasta nova. A URL continua a mesma.
+
+Não apague os arquivos _headers e _redirects: eles configuram o Netlify.
+`;
+function saveFile(name, data){
+  const blob = data instanceof Blob ? data : new Blob([data], {type: 'text/plain;charset=utf-8'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+async function setupDownloads(){
+  $('dlTxt').hidden = false; $('dlTxt').textContent = 'Baixar lista.m3u8';
+  $('dlTxt').addEventListener('click', () => { saveFile('lista.m3u8', $('outRaw').value); flash('lista.m3u8 baixado.'); });
+  if (typeof JSZip === 'undefined') { flash('Sem internet os botões de pacote .zip ficam escondidos. Use "Baixar lista.m3u8".'); return; }
+  saver = async (filename, data) => saveFile(filename, data);
+  $('dlSrv').hidden = false;
+  $('dlZip').hidden = false;
+  $('dlZip').addEventListener('click', async () => {
+    try {
+      const zip = new JSZip(), f = zip.folder('lista-iptv-netlify');
+      f.file('lista.m3u8', $('outRaw').value); f.file('_headers', HEADERS); f.file('_redirects', REDIRECTS); f.file('index.html', INDEX); f.file('LEIA-ME.txt', README);
+      saveFile('lista-iptv-netlify.zip', await zip.generateAsync({type: 'blob'}));
+      flash('Pacote baixado. Extraia e arraste a pasta no Netlify.');
+    } catch(err) { flash('Não foi possível gerar o pacote. Use "Baixar lista.m3u8".', true); }
+  });
+}
+
+
+/* ================= abas de Canais ================= */
+let ctab = 'live';
+try { const t = localStorage.getItem('montador-aba'); if (['live','movie','series'].includes(t)) ctab = t; } catch(e) {}
+function setCtab(t){
+  ctab = t;
+  document.querySelectorAll('[data-ctab]').forEach(b => b.setAttribute('aria-selected', b.dataset.ctab === t));
+  $('ct-live').hidden = t !== 'live'; $('ct-movie').hidden = t !== 'movie'; $('ct-series').hidden = t !== 'series';
+  document.querySelectorAll('.live-only').forEach(el => { el.style.display = t === 'live' ? '' : 'none'; });
+  $('q').placeholder = t === 'movie' ? 'Buscar filme' : t === 'series' ? 'Buscar série' : 'Buscar canal';
+  if (!checkBusy) $('checkAll').textContent = CHECK_LABEL[t];
+  vodEdit = null;
+  try { localStorage.setItem('montador-aba', t); } catch(e) {}
+  render();
+}
+document.querySelectorAll('[data-ctab]').forEach(b => b.addEventListener('click', () => setCtab(b.dataset.ctab)));
+
+/* ================= filmes e séries ================= */
+const vid = () => 'v' + Date.now().toString(36) + (seq++).toString(36);
+const VOD_URL_RE = /^https?:\/\/\S+$/i;
+function vodGroups(kind){
+  const list = kind === 'movie' ? state.movies : state.series, key = kind === 'movie' ? 'movieGroups' : 'seriesGroups';
+  list.forEach(x => { if (x.group && !state[key].includes(x.group)) state[key].push(x.group); });
+  return state[key];
+}
+function fillDatalist(id, arr){ const dl = $(id); dl.textContent = ''; arr.forEach(g => { const o = document.createElement('option'); o.value = g; dl.appendChild(o); }); }
+function vodGroupHead(g, n, gi, total, kind){
+  const head = document.createElement('div'); head.className = 'g-head'; head.dataset.g = g; head.dataset.kind = kind;
+  head.innerHTML = `<span class="g-bar" aria-hidden="true"></span><span class="g-name"></span><span class="g-count">${n}</span>
+    <span class="g-actions">
+      <button class="icon" type="button" data-vg="up" aria-label="Subir grupo" ${gi === 0 ? 'disabled' : ''}>↑</button>
+      <button class="icon" type="button" data-vg="down" aria-label="Descer grupo" ${gi === total - 1 ? 'disabled' : ''}>↓</button>
+      <button class="icon" type="button" data-vg="ren">Renomear</button>
+      <button class="icon del" type="button" data-vg="del">Excluir</button>
+    </span>`;
+  head.querySelector('.g-name').textContent = g;
+  return head;
+}
+function vodEmpty(box, txt){ const e = document.createElement('div'); e.className = 'empty'; e.textContent = txt; box.appendChild(e); }
+
+/* ---- filmes e séries: mesma estrutura da TV ao vivo ---- */
+let vodEdit = null, serSel = null, epEdit = null;
+const epKey = x => x.season * 10000 + x.ep;
+function tabItems(t){ return t === 'movie' ? state.movies : t === 'series' ? state.series.flatMap(s => s.episodes) : state.channels; }
+function seriesState(s){
+  const r = {ok: 0, off: 0, run: 0, none: 0, fora: 0, total: s.episodes.length};
+  s.episodes.forEach(e => {
+    if (runningNow.has(e.url)) r.run++;
+    else if (e.fora) r.fora++;
+    else { const h = health[e.url]; if (h && h.s === 'ok') r.ok++; else if (h && h.s === 'off') r.off++; else r.none++; }
+  });
+  return r;
+}
+function seriesDot(el, st){
+  if (!TEST_ENABLED) return;
+  const cls = !st.total ? 'none' : st.run ? 'run' : st.fora === st.total ? 'fora' : st.off ? 'off' : st.ok ? 'ok' : 'none';
+  const d = document.createElement('span'); d.className = 'hdot ' + cls;
+  d.title = st.total ? `${st.ok} de ${st.total} episódios ${EXT ? 'transmitindo' : 'respondendo'}${st.off ? `, ${st.off} sem resposta` : ''}${st.fora ? `, ${st.fora} fora da lista` : ''}${st.none ? `, ${st.none} não verificados` : ''}` : 'Sem episódios';
+  d.setAttribute('role', 'img'); d.setAttribute('aria-label', d.title);
+  el.prepend(d);
+}
+function seriesMeta(s){
+  const t = new Set(s.episodes.map(x => x.season)).size, n = s.episodes.length;
+  return n ? `${t} ${t === 1 ? 'temporada' : 'temporadas'} · ${n} ${n === 1 ? 'episódio' : 'episódios'}` : 'sem episódios: arraste itens de Canais inseridos para cima da série';
+}
+function itemRow(kind, it, n){
+  const row = document.createElement('div');
+  row.className = 'ch' + (TEST_ENABLED && it.fora ? ' fora' : '') + (kind === 'series' && it.id === serSel ? ' editing' : '');
+  row.draggable = true; row.dataset.id = it.id; row.dataset.kind = kind;
+  if (kind === 'series') row.dataset.drop = 'srow';
+  const st = kind === 'series' ? seriesState(it) : null;
+  const red = kind === 'movie' && health[it.url] && health[it.url].s === 'off';
+  const foraBtn = TEST_ENABLED && kind === 'movie' && (it.fora || red) ? `<button class="icon" type="button" data-v="fora">${it.fora ? 'Voltar à lista' : 'Tirar da lista'}</button>` : '';
+  row.innerHTML = `<span class="grip" aria-hidden="true">⋮⋮</span><span class="ch-num">${n}</span>
+    <div class="ch-main"><span class="ch-name"></span><span class="ch-url"></span></div>
+    <span class="ch-actions">
+      <button class="icon" type="button" data-v="up" aria-label="Subir" title="Subir">↑</button>
+      <button class="icon" type="button" data-v="down" aria-label="Descer" title="Descer">↓</button>
+      ${kind === 'series' ? `<button class="icon" type="button" data-v="eps">${it.id === serSel ? 'Fechar episódios' : 'Episódios'}</button>` : ''}
+      ${foraBtn}
+      <button class="icon" type="button" data-v="edit">Editar</button>
+      <button class="icon del" type="button" data-v="del">Excluir</button>
+    </span>`;
+  const nm = row.querySelector('.ch-name'); nm.textContent = it.name + (it.year ? ` (${it.year})` : '');
+  if (kind === 'movie') healthDot(it, nm); else seriesDot(nm, st);
+  const u = row.querySelector('.ch-url');
+  u.textContent = kind === 'series' ? seriesMeta(it) : it.url; u.title = u.textContent;
+  return row;
+}
+function editRow(kind, it){
+  const f = document.createElement('form'); f.className = 'vedit'; f.noValidate = true;
+  const campos = kind === 'movie'
+    ? [['name', 'Nome do filme'], ['url', 'Link do vídeo'], ['logo', 'Capa (opcional)'], ['year', 'Ano (opcional)'], ['plot', 'Sinopse (opcional)']]
+    : [['name', 'Nome da série'], ['logo', 'Capa (opcional)'], ['plot', 'Sinopse (opcional)']];
+  campos.forEach(([k, label]) => {
+    const d = document.createElement('div'); d.className = 'field' + (k === 'url' || k === 'plot' ? ' wide' : '');
+    d.innerHTML = `<label for="ve-${k}"></label><input class="in" id="ve-${k}" autocomplete="off">`;
+    d.querySelector('label').textContent = label;
+    const i = d.querySelector('input'); i.value = it[k] || ''; if (k === 'url' || k === 'logo') i.classList.add('mono');
+    f.appendChild(d);
+  });
+  const err = document.createElement('p'); err.className = 'err wide'; f.appendChild(err);
+  const bt = document.createElement('div'); bt.className = 'btns wide';
+  bt.innerHTML = '<button class="btn sm primary" type="submit">Salvar</button><button class="btn sm" type="button" data-cancel>Cancelar</button>';
+  f.appendChild(bt);
+  bt.querySelector('[data-cancel]').addEventListener('click', () => { vodEdit = null; render(); });
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    const v = k => { const i = f.querySelector('#ve-' + k); return i ? i.value.trim() : undefined; };
+    const name = clean(v('name')), url = v('url'), logo = v('logo');
+    if (!name) { err.textContent = 'Escreva o nome.'; return; }
+    if (kind === 'movie' && !VOD_URL_RE.test(url)) { err.textContent = 'O link precisa começar com http:// ou https:// e não pode ter espaços.'; return; }
+    if (logo && !VOD_URL_RE.test(logo)) { err.textContent = 'A capa precisa ser um link http:// ou https://.'; return; }
+    Object.assign(it, {name, logo, plot: v('plot') || ''}, kind === 'movie' ? {url, year: clean(v('year'))} : {});
+    vodEdit = null; render(); flash(`"${name}" atualizado.`);
+  });
+  return f;
+}
+function renderVodTab(kind){
+  const groups = vodGroups(kind), arr = kind === 'movie' ? state.movies : state.series;
+  const box = $(kind === 'movie' ? 'movList' : 'serList'); box.textContent = '';
+  if (kind === 'movie') fillDatalist('movGroupList', groups); else fillDatalist('serGroupList', groups);
+  if (!groups.length) {
+    vodEmpty(box, kind === 'movie'
+      ? 'Nenhum filme ainda. Arraste itens de Canais inseridos para cá, ou use a Lista em lote com a opção "Filmes". Eles aparecem na seção MOVIES do app.'
+      : 'Nenhuma série ainda. Arraste um item de Canais inseridos para cá: ele vira uma série nova. Depois arraste outros itens para cima da série para virarem episódios. Elas aparecem na seção SERIES do app.');
+    return;
+  }
+  const q = filter.toLowerCase(); let idx = 0;
+  groups.forEach((g, gi) => {
+    const all = arr.filter(x => x.group === g);
+    const numbered = all.map(x => ({x, n: ++idx}));
+    const vis = q ? numbered.filter(({x}) => x.name.toLowerCase().includes(q) || g.toLowerCase().includes(q) || (x.url || '').toLowerCase().includes(q)) : numbered;
+    if (q && !vis.length) return;
+    const sec = document.createElement('div'); sec.className = 'group'; sec.dataset.drop = kind === 'movie' ? 'mgroup' : 'sgroup'; sec.dataset.g = g;
+    sec.appendChild(vodGroupHead(g, all.length, gi, groups.length, kind));
+    if (!all.length) { const d = document.createElement('div'); d.className = 'g-drop'; d.textContent = 'Grupo vazio. Arraste itens de Canais inseridos para cá.'; sec.appendChild(d); }
+    vis.forEach(({x, n}) => sec.appendChild(x.id === vodEdit ? editRow(kind, x) : itemRow(kind, x, n)));
+    box.appendChild(sec);
+  });
+}
+function renderMovies(){ $('movCount').textContent = state.movies.length ? String(state.movies.length) : ''; renderVodTab('movie'); }
+function renderSeries(){ $('serCount').textContent = state.series.length ? String(state.series.length) : ''; renderVodTab('series'); renderEpisodes(); }
+function episodeEditForm(s, x){
+  const wrap = document.createElement('div'); wrap.className = 'ep-edit';
+  const f = document.createElement('form'); f.className = 'ep-form'; f.noValidate = true;
+  f.innerHTML = `<div class="field"><label for="ee-temp">Temp.</label><input class="in" id="ee-temp" type="number" min="1"></div>
+    <div class="field"><label for="ee-num">Ep.</label><input class="in" id="ee-num" type="number" min="1"></div>
+    <div class="field"><label for="ee-tit">Título <em>(opcional)</em></label><input class="in" id="ee-tit" autocomplete="off"></div>
+    <div class="field ep-url"><label for="ee-url">Link do episódio</label><input class="in mono" id="ee-url" autocomplete="off" inputmode="url"></div>
+    <p class="err"></p>
+    <div class="btns"><button class="btn sm primary" type="submit">Salvar</button><button class="btn sm" type="button" data-cancel>Cancelar</button></div>`;
+  f.querySelector('#ee-temp').value = x.season; f.querySelector('#ee-num').value = x.ep;
+  f.querySelector('#ee-tit').value = x.title || ''; f.querySelector('#ee-url').value = x.url;
+  const err = f.querySelector('.err');
+  f.querySelector('[data-cancel]').addEventListener('click', () => { epEdit = null; render(); });
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    const season = parseInt(f.querySelector('#ee-temp').value, 10), ep = parseInt(f.querySelector('#ee-num').value, 10);
+    const title = clean(f.querySelector('#ee-tit').value), url = f.querySelector('#ee-url').value.trim();
+    if (!(season > 0) || !(ep > 0)) { err.textContent = 'Temporada e episódio precisam ser números a partir de 1.'; return; }
+    if (!VOD_URL_RE.test(url)) { err.textContent = 'O link precisa começar com http:// ou https:// e não pode ter espaços.'; return; }
+    const dup = s.episodes.find(o => o !== x && o.season === season && o.ep === ep);
+    if (dup) { err.textContent = `Já existe um episódio T${season} E${ep}. Exclua-o antes ou escolha outro número.`; return; }
+    Object.assign(x, {season, ep, title, url});
+    epEdit = null; render(); flash(`Episódio T${season} E${ep} atualizado.`);
+  });
+  wrap.appendChild(f);
+  return wrap;
+}
+function renderEpisodes(){
+  const s = state.series.find(x => x.id === serSel);
+  $('epBox').hidden = !s; if (!s) { epEdit = null; return; }
+  $('epSerie').textContent = s.name;
+  const box = $('epList'); box.textContent = '';
+  const eps = s.episodes.slice().sort((a, b) => epKey(a) - epKey(b));
+  if (!eps.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Nenhum episódio ainda.'; box.appendChild(p); return; }
+  let last = null;
+  eps.forEach(x => {
+    if (x.season !== last) { last = x.season; const h = document.createElement('div'); h.className = 'ep-season'; h.textContent = `Temporada ${x.season}`; box.appendChild(h); }
+    if (x.id === epEdit) { box.appendChild(episodeEditForm(s, x)); return; }
+    const red = health[x.url] && health[x.url].s === 'off';
+    const r = document.createElement('div'); r.className = 'ep-row' + (TEST_ENABLED && x.fora ? ' fora' : ''); r.dataset.id = x.id;
+    r.innerHTML = `<span class="vmeta">E${String(x.ep).padStart(2, '0')}</span><div class="ch-main"><span class="ch-name"></span><span class="vmeta"></span></div>
+      <span class="ch-actions">${TEST_ENABLED && (x.fora || red) ? `<button class="icon" type="button" data-e="fora">${x.fora ? 'Voltar à lista' : 'Tirar da lista'}</button>` : ''}<button class="icon" type="button" data-e="edit">Editar</button><button class="icon del" type="button" data-e="del">Excluir</button></span>`;
+    const nm = r.querySelector('.ch-name'); nm.textContent = x.title || `Episódio ${x.ep}`; healthDot(x, nm);
+    r.querySelector('.ch-main .vmeta').textContent = x.url;
+    box.appendChild(r);
+  });
+}
+function addEpisode(s, season, ep, title, url){
+  const old = s.episodes.find(x => x.season === season && x.ep === ep);
+  if (old) Object.assign(old, {title: title || old.title, url});
+  else s.episodes.push({id: vid(), season, ep, title, url});
+}
+$('epForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const s = state.series.find(x => x.id === serSel); if (!s) return;
+  const season = parseInt($('eTemp').value, 10), ep = parseInt($('eNum').value, 10), title = clean($('eTit').value), url = $('eUrl').value.trim();
+  if (!(season > 0) || !(ep > 0)) { $('eErr').textContent = 'Temporada e episódio precisam ser números a partir de 1.'; return; }
+  if (!VOD_URL_RE.test(url)) { $('eErr').textContent = 'O link precisa começar com http:// ou https:// e não pode ter espaços.'; return; }
+  addEpisode(s, season, ep, title, url);
+  $('eErr').textContent = ''; $('eTit').value = ''; $('eUrl').value = ''; $('eNum').value = ep + 1;
+  render(); $('eUrl').focus();
+});
+$('eBulkAdd').addEventListener('click', () => {
+  const s = state.series.find(x => x.id === serSel); if (!s) return;
+  let n = 0; const errs = [];
+  $('eBulk').value.replace(/\r/g, '').split('\n').forEach((raw, i) => {
+    const l = raw.trim(); if (!l) return;
+    const parts = l.split(/\s*\|\s*/);
+    const url = parts[parts.length - 1], season = parseInt(parts[0], 10), ep = parseInt(parts[1], 10), title = parts.length >= 4 ? clean(parts[2]) : '';
+    if (!(season > 0) || !(ep > 0) || !VOD_URL_RE.test(url || '')) { errs.push(`Linha ${i + 1}: use Temporada | Episódio | Título | Link.`); return; }
+    addEpisode(s, season, ep, title, url); n++;
+  });
+  $('eBulkErr').textContent = errs.slice(0, 4).join(' ');
+  if (n) { if (!errs.length) $('eBulk').value = ''; flash(`${n} episódios adicionados em "${s.name}".`); render(); }
+});
+$('epList').addEventListener('click', e => {
+  const b = e.target.closest('button[data-e]'); if (!b) return;
+  const s = state.series.find(x => x.id === serSel); if (!s) return;
+  const row = b.closest('.ep-row'); if (!row) return;
+  const id = row.dataset.id, at = s.episodes.findIndex(x => x.id === id); if (at < 0) return;
+  if (b.dataset.e === 'fora') { const x = s.episodes[at]; x.fora = !x.fora; render(); flash(x.fora ? 'Episódio tirado da lista publicada.' : 'Episódio voltou para a lista publicada.'); return; }
+  if (b.dataset.e === 'edit') { epEdit = id; render(); const i = $('ee-temp'); if (i) { i.focus(); i.select(); } return; }
+  const [x] = s.episodes.splice(at, 1); render();
+  showToast(`Episódio excluído.`, 'Desfazer', () => { s.episodes.splice(at, 0, x); render(); });
+});
+function vodItemAction(act, kind, id, b){
+  const arr = kind === 'movie' ? state.movies : state.series, it = arr.find(x => x.id === id); if (!it) return;
+  if (act === 'up' || act === 'down') {
+    const same = arr.filter(x => x.group === it.group), k = same.indexOf(it), other = same[act === 'up' ? k - 1 : k + 1];
+    if (!other) return;
+    const a = arr.indexOf(it), c = arr.indexOf(other); [arr[a], arr[c]] = [arr[c], arr[a]]; render();
+  }
+  if (act === 'edit') { vodEdit = id; render(); const i = $('ve-name'); if (i) i.focus(); }
+  if (act === 'fora') { it.fora = !it.fora; render(); flash(it.fora ? `"${it.name}" saiu da lista publicada. Rode o publicar.bat.` : `"${it.name}" voltou para a lista publicada. Rode o publicar.bat.`); }
+  if (act === 'eps') { epEdit = null; serSel = serSel === id ? null : id; render(); if (serSel) $('epBox').scrollIntoView({block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth'}); }
+  if (act === 'del') {
+    if (kind === 'series' && !b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Confirmar'; setTimeout(() => { if (b.isConnected) { b.classList.remove('armed'); b.textContent = 'Excluir'; } }, 4000); return; }
+    const at = arr.indexOf(it); arr.splice(at, 1); if (serSel === id) { serSel = null; epEdit = null; } if (vodEdit === id) vodEdit = null; render();
+    showToast(`"${it.name}" excluído.`, 'Desfazer', () => { arr.splice(at, 0, it); render(); });
+  }
+}
+['movList', 'serList'].forEach(boxId => $(boxId).addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.closest('form')) return;
+  const kind = boxId === 'movList' ? 'movie' : 'series';
+  if (b.dataset.vg) return vodGroupAction(b, kind);
+  const row = b.closest('.ch'); if (row && b.dataset.v) vodItemAction(b.dataset.v, kind, row.dataset.id, b);
+}));
+
+/* ---- grupos de filmes/séries ---- */
+function vodGroupAction(b, kind){
+  const head = b.closest('.g-head'), g = head.dataset.g, key = kind === 'movie' ? 'movieGroups' : 'seriesGroups', list = kind === 'movie' ? state.movies : state.series;
+  const arr = state[key], i = arr.indexOf(g);
+  if (b.dataset.vg === 'del') {
+    const n = list.filter(x => x.group === g).length;
+    if (n) { flash(`O grupo "${g}" ainda tem ${n} ${kind === 'movie' ? (n === 1 ? 'filme' : 'filmes') : (n === 1 ? 'série' : 'séries')}. Mova ou exclua antes de apagar o grupo.`, true); return; }
+    arr.splice(i, 1); render(); flash(`Grupo "${g}" excluído.`); return;
+  }
+  if (b.dataset.vg === 'up' && i > 0) { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; render(); }
+  if (b.dataset.vg === 'down' && i < arr.length - 1) { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; render(); }
+  if (b.dataset.vg === 'ren') {
+    const slot = head.querySelector('.g-name'), inp = document.createElement('input');
+    inp.value = g; inp.setAttribute('aria-label', 'Novo nome do grupo'); slot.textContent = ''; slot.appendChild(inp); inp.focus(); inp.select();
+    let done = false;
+    const fin = ok => {
+      if (done) return; done = true;
+      const nv = clean(inp.value);
+      if (ok && nv && nv !== g) {
+        list.forEach(x => { if (x.group === g) x.group = nv; });
+        if (arr.includes(nv)) arr.splice(arr.indexOf(g), 1); else arr[arr.indexOf(g)] = nv;
+        flash(`Grupo renomeado para "${nv}".`);
+      }
+      render();
+    };
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') fin(true); if (ev.key === 'Escape') fin(false); });
+    inp.addEventListener('blur', () => fin(true));
+  }
+}
+function renderVod(){ renderMovies(); renderSeries(); }
+
+/* ================= teste de canais ================= */
+const TEST_ENABLED = true;
+const HKEY = 'montador-saude-v1', HWHEN = 'montador-saude-quando';
+let health = {}, healthWhen = 0;
+try { health = JSON.parse(localStorage.getItem(HKEY) || '{}') || {}; healthWhen = +localStorage.getItem(HWHEN) || 0; } catch(e) {}
+const saveHealth = () => { try { localStorage.setItem(HKEY, JSON.stringify(health)); localStorage.setItem(HWHEN, String(healthWhen)); } catch(e) {} };
+const runningNow = new Set();
+let EXT = null;
+const DOT_TITLE = {ok: 'O site respondeu', off: 'Sem resposta', unk: 'Não dá para verificar', run: 'Verificando agora…', none: 'Ainda não verificado', fora: 'Fora da lista publicada (volta sozinho quando ficar online numa verificação)'};
+const quando = t => new Date(t).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+function healthDot(c, el){
+  if (!TEST_ENABLED || !el) return;
+  const url = c.url, h = health[url], s = runningNow.has(url) ? 'run' : c.fora ? 'fora' : (h ? h.s : 'none');
+  const d = document.createElement('span'); d.className = 'hdot ' + s;
+  d.title = DOT_TITLE[s] + (h && s !== 'run' && s !== 'none' ? ` · ${h.d} (verificado em ${quando(h.t)})` : '');
+  d.setAttribute('role', 'img'); d.setAttribute('aria-label', d.title);
+  el.prepend(d);
+}
+function setHealth(url, s, d){ health[url] = {s, d, t: Date.now()}; saveHealth(); }
+
+function withTimeout(ms){ const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms); return {signal: ctl.signal, done: () => clearTimeout(t), stop: () => { clearTimeout(t); ctl.abort(); }}; }
+// Com a extensao: verificacao completa (transmissao). Sem ela: so confere se o site responde.
+const extPend = new Map(); let extSeq = 0;
+window.addEventListener('message', ev => {
+  if (ev.source !== window || !ev.data || ev.data.src !== 'ext-verificador') return;
+  const m = ev.data;
+  if (m.tipo === 'ola' && !EXT) { EXT = m.versao || '1'; updateLegend(); render(); }
+  if (m.tipo === 'resultado' && extPend.has(m.id)) { const f = extPend.get(m.id); extPend.delete(m.id); f(m.res); }
+});
+function extCheck(url, kind){
+  return new Promise(res => {
+    const id = ++extSeq; extPend.set(id, res);
+    window.postMessage({src: 'montador', tipo: 'verificar', id, url, kind: kind || 'live'}, '*');
+    setTimeout(() => { if (extPend.has(id)) { extPend.delete(id); res({s: 'off', d: 'O canal demorou demais para responder.'}); } }, 90000);
+  });
+}
+function updateLegend(){
+  const el = $('legendTxt'); if (!el) return;
+  const quem = EXT ? '<b>Verificação completa pela extensão.</b>' : '<span>Verificação simples (só confere se o site responde). Para conferir a transmissão, instale a extensão da pasta <code>extensao-verificador</code>.</span>';
+  const ult = healthWhen ? `<span>Última verificação: ${quando(healthWhen)}.</span>` : '<span>Nenhuma verificação ainda: clique em "Verificar canais".</span>';
+  el.innerHTML = (EXT
+    ? '<span class="hdot ok"></span>transmitindo <span class="hdot off"></span>sem transmissão '
+    : '<span class="hdot ok"></span>o site respondeu <span class="hdot off"></span>sem resposta ')
+    + '<span class="hdot fora"></span>fora da lista (volta se ficar online) <span class="hdot run"></span>verificando agora <span class="hdot none"></span>não verificado ' + quem + ' ' + ult;
+  DOT_TITLE.ok = EXT ? 'Transmitindo' : 'O site respondeu';
+  DOT_TITLE.off = EXT ? 'Sem transmissão' : 'Sem resposta';
+}
+async function quickCheck(url, kind){
+  if (EXT) return extCheck(url, kind);
+  return siteCheck(url);
+}
+async function siteCheck(url){
+  if (!/^https?:\/\//i.test(url)) return {s: 'unk', d: 'Links RTMP/UDP não podem ser verificados pelo navegador.'};
+  let ultimo = null;
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    const w = withTimeout(15000);
+    try {
+      await fetch(url, {mode: 'no-cors', cache: 'no-store', signal: w.signal});
+      w.stop();
+      return {s: 'ok', d: 'O site do canal respondeu.'};
+    } catch(e) { ultimo = e; w.done(); }
+  }
+  return {s: 'off', d: ultimo && ultimo.name === 'AbortError' ? 'O site do canal não respondeu em 15 segundos.' : 'O site do canal não respondeu.'};
+}
+
+// A verificacao so roda quando o botao e apertado. O resultado fica salvo ate a proxima.
+let checkQueue = [], workers = 0, renderSoon = null, checkBusy = false, checkTotal = 0, checkDone = 0, checkUrls = [], checkKind = 'live';
+const CHECK_LABEL = {live: 'Verificar canais', movie: 'Verificar filmes', series: 'Verificar episódios'};
+const soon = () => { clearTimeout(renderSoon); renderSoon = setTimeout(render, 120); };
+async function runWorker(){
+  workers++;
+  while (checkQueue.length) {
+    const u = checkQueue.shift();
+    runningNow.add(u); soon();
+    let r; try { r = await quickCheck(u, checkKind); } catch(e) { r = {s: 'unk', d: 'Não deu para verificar.'}; }
+    setHealth(u, r.s, r.d); runningNow.delete(u);
+    checkDone++; $('checkAll').textContent = `Verificando ${checkDone}/${checkTotal}…`;
+    soon();
+  }
+  workers--;
+  if (!workers) finishCheck();
+}
+function startCheck(){
+  if (checkBusy) return;
+  const urls = [...new Set(tabItems(ctab).map(c => c.url).filter(Boolean))];
+  if (!urls.length) { flash(ctab === 'movie' ? 'Não há filmes para verificar.' : ctab === 'series' ? 'Não há episódios para verificar.' : 'Não há canais para verificar.', true); return; }
+  checkKind = ctab;
+  checkUrls = urls; checkBusy = true; checkTotal = urls.length; checkDone = 0; checkQueue = urls.slice();
+  $('checkAll').disabled = true; $('checkAll').textContent = `Verificando 0/${checkTotal}…`;
+  for (let i = 0; i < 4 && checkQueue.length; i++) runWorker();
+}
+function finishCheck(){
+  checkBusy = false; healthWhen = Date.now(); saveHealth();
+  let voltaram = 0;
+  [...state.channels, ...state.movies, ...state.series.flatMap(s => s.episodes)].forEach(c => { if (c.fora && health[c.url] && health[c.url].s === 'ok') { c.fora = false; voltaram++; } });
+  $('checkAll').disabled = false; $('checkAll').textContent = CHECK_LABEL[ctab];
+  updateLegend(); render();
+  const urls = checkUrls, t = {ok: 0, off: 0, unk: 0};
+  urls.forEach(u => { const h = health[u]; if (h && t[h.s] !== undefined) t[h.s]++; });
+  flash(`${t.ok} ${EXT ? 'transmitindo' : 'respondendo'} · ${t.off} ${EXT ? 'sem transmissão' : 'sem resposta'}${t.unk ? ` · ${t.unk} sem como verificar` : ''}.${voltaram ? ` ${voltaram} ${voltaram === 1 ? 'item voltou' : 'itens voltaram'} para a lista publicada.` : ''}`, t.off > 0);
+  if (typeof onDataChange === 'function') onDataChange();
+}
+if (TEST_ENABLED) {
+  document.querySelectorAll('.test-only').forEach(el => el.hidden = false);
+  updateLegend();
+  window.postMessage({src: 'montador', tipo: 'ping'}, '*');
+  $('checkAll').addEventListener('click', startCheck);
+  $('dropRed').addEventListener('click', () => {
+    let n = 0;
+    tabItems(ctab).forEach(c => { if (!c.fora && health[c.url] && health[c.url].s === 'off') { c.fora = true; n++; } });
+    render();
+    flash(`${n} ${n === 1 ? 'item saiu' : 'itens saíram'} da lista publicada e ${n === 1 ? 'ficou' : 'ficaram'} roxos. Se ficarem online numa próxima verificação, voltam sozinhos. Rode o publicar.bat.`);
+  });
+}
+
+/* ================= servidor com login ================= */
+const SERVER_FILES = /*SRV*/{"netlify.toml": "[build]\n  publish = \"public\"\n\n[functions]\n  directory = \"netlify/functions\"\n  node_bundler = \"esbuild\"\n", "publicar.bat": "@echo off\nchcp 65001 >nul\ncd /d \"%~dp0\"\nwhere node >nul 2>nul\nif errorlevel 1 (\n  echo O Node.js nao esta instalado. Baixe em https://nodejs.org ^(versao LTS^), instale e rode este arquivo de novo.\n  pause\n  exit /b\n)\necho Publicando no Netlify...\necho Na primeira vez ele abre o navegador para entrar na sua conta e pergunta qual site usar.\necho.\ncall npx -y netlify-cli deploy --prod\necho.\npause\n", "LEIA-ME.txt": "SERVIDOR DA TV DA FAMILIA (login no padrao Xtream Codes)\n\nO QUE TEM AQUI\n- montador.html       : o Montador (canais, grupos, usuarios). Abra no Chrome ou Edge.\n- dados/usuarios.json : quem pode entrar (usuario, senha, validade)\n- dados/canais.json   : os canais e grupos (gerado pelo Montador)\n- netlify/            : o codigo que responde ao IPTV Smarters\n- public/index.html   : pagina inicial do site, com as instrucoes de login\n- publicar.bat        : publica tudo no Netlify\n- extensao-verificador: extensao do Chrome que confere se os canais estao transmitindo\n                        (instrucoes no LEIA-ME de dentro dela)\n\nATENCAO: esta pasta tem as senhas da familia. Nao publique em repositorio publico.\nAs senhas NAO ficam visiveis no site: so o codigo do servidor le esses arquivos.\n\nPUBLICAR (Windows)\n1. Instale o Node.js (versao LTS) em https://nodejs.org, se ainda nao tiver.\n2. Dê dois cliques em publicar.bat.\n3. Na primeira vez: ele abre o navegador para entrar no Netlify e pergunta\n   se quer criar um site novo ou usar um existente. Depois disso, é automatico.\n   (Arrastar a pasta em app.netlify.com/drop NAO serve aqui: esse jeito\n   publica só a pagina, sem a parte que confere o login.)\n\nNO IPTV SMARTERS\nEscolha \"Login with Xtream Codes API\" e preencha:\n- Any Name : qualquer nome (ex.: TV da Familia)\n- Username : o usuario\n- Password : a senha\n- URL      : https://SEU-SITE.netlify.app   (sem porta)\n\nOutros apps: a lista M3U com login fica em\nhttps://SEU-SITE.netlify.app/get.php?username=USUARIO&password=SENHA&type=m3u_plus\n\nATUALIZAR CANAIS OU USUARIOS\n1. Abra o montador.html (Chrome ou Edge).\n2. Na primeira vez, clique em \"Abrir pasta do servidor\" e escolha ESTA pasta.\n   O navegador pede permissao para editar arquivos: permita.\n3. Faca as mudancas. O Montador salva sozinho na pasta dados.\n4. Rode o publicar.bat para colocar no ar.\nOs usuarios continuam com o mesmo login.\nPara tirar o acesso de alguem: exclua ou desative o usuario e publique de novo.\nO montador.html nao vai para o site: so a pasta public e publicada.\n\nSE UM CANAL NAO ABRIR NO APP\nEm Configuracoes do IPTV Smarters, troque o formato de transmissao\n(Stream Format) para HLS / m3u8.\n", "public/index.html": "<!doctype html>\n<html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>TV da Família<\/title>\n<style>body{font-family:system-ui,sans-serif;max-width:560px;margin:40px auto;padding:0 16px;background:#111;color:#eee;line-height:1.5}\ncode{display:block;background:#222;padding:12px;border-radius:8px;word-break:break-all;margin:6px 0 16px}<\/style><\/head>\n<body><h1>TV da Família<\/h1>\n<p>No IPTV Smarters, escolha <b>Login with Xtream Codes API<\/b> e preencha:<\/p>\n<p>Any Name: qualquer nome<br>Username e Password: os que você recebeu<\/p>\n<p>URL:<\/p><code id=\"u\"><\/code>\n<script>document.getElementById('u').textContent=location.origin<\/script>\n<\/body><\/html>\n", "netlify/lib/comum.mjs": "// Base do servidor: le usuarios e canais, confere login e monta as respostas.\nimport USUARIOS from '../../dados/usuarios.json';\nimport DADOS from '../../dados/canais.json';\n\nconst CANAIS = Array.isArray(DADOS) ? DADOS : (DADOS.canais || []);\nexport const EPG = Array.isArray(DADOS) ? '' : (DADOS.epg || '');\n\nfunction fnv(s) {\n  let h = 0x811c9dc5;\n  for (const ch of s) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }\n  return h;\n}\nconst norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();\n\n// IDs estaveis: o mesmo canal mantem o mesmo numero mesmo se a ordem da lista mudar.\nfunction montar() {\n  const cats = [], streams = [], catIds = new Map(), usados = new Set(), catUsados = new Set();\n  CANAIS.forEach(c => {\n    if (!c || !c.url || !c.nome) return;\n    const grupo = String(c.grupo || 'Sem grupo').trim();\n    if (!catIds.has(grupo)) {\n      let id = 1000 + fnv('g:' + norm(grupo)) % 9000;\n      while (catUsados.has(id)) id++;\n      catUsados.add(id); catIds.set(grupo, id);\n      cats.push({ category_id: String(id), category_name: grupo, parent_id: 0 });\n    }\n    let sid = Number.isInteger(c.id) && c.id > 0 ? c.id : 100000 + fnv('c:' + norm(c.nome)) % 900000;\n    while (usados.has(sid)) sid++;\n    usados.add(sid);\n    const cat = catIds.get(grupo);\n    streams.push({\n      num: streams.length + 1, name: c.nome, stream_type: 'live', stream_id: sid,\n      stream_icon: c.logo || '', epg_channel_id: c.epg || null, added: '0', is_adult: '0',\n      category_id: String(cat), category_ids: [cat], custom_sid: '', tv_archive: 0,\n      direct_source: '', tv_archive_duration: 0, _url: c.url\n    });\n  });\n  return { cats, streams };\n}\nexport const DATA = montar();\n\n// ---------- Filmes e series ----------\nconst FILMES = Array.isArray(DADOS) ? [] : (DADOS.filmes || []);\nconst SERIES = Array.isArray(DADOS) ? [] : (DADOS.series || []);\nconst extensao = url => { const m = String(url).split('?')[0].match(/\\.([a-z0-9]{2,4})$/i); return m ? m[1].toLowerCase() : 'mp4'; };\nfunction idUnico(base, usados) { let id = base; while (usados.has(id)) id++; usados.add(id); return id; }\nfunction categorias(itens, prefixo) {\n  const cats = [], ids = new Map(), usados = new Set();\n  itens.forEach(x => {\n    const g = String(x.grupo || 'Outros').trim();\n    if (!ids.has(g)) { const id = idUnico(1000 + fnv(prefixo + norm(g)) % 9000, usados); ids.set(g, id); cats.push({ category_id: String(id), category_name: g, parent_id: 0 }); }\n  });\n  return { cats, ids };\n}\nfunction montarFilmes() {\n  const itens = FILMES.filter(f => f && f.nome && f.url);\n  const { cats, ids } = categorias(itens, 'fg:');\n  const usados = new Set(), lista = [], porId = new Map();\n  itens.forEach(f => {\n    const g = String(f.grupo || 'Outros').trim(), cat = ids.get(g);\n    const id = idUnico(200000 + fnv('f:' + norm(f.nome) + '|' + norm(g)) % 700000, usados);\n    const item = {\n      num: lista.length + 1, name: f.nome, stream_type: 'movie', stream_id: id, stream_icon: f.logo || '',\n      rating: '', rating_5based: 0, added: '0', is_adult: '0', category_id: String(cat), category_ids: [cat],\n      container_extension: extensao(f.url), custom_sid: '', direct_source: '',\n      _url: f.url, _ano: f.ano || '', _sinopse: f.sinopse || ''\n    };\n    lista.push(item); porId.set(id, item);\n  });\n  return { cats, lista, porId };\n}\nfunction montarSeries() {\n  const itens = SERIES.filter(s => s && s.nome && Array.isArray(s.episodios) && s.episodios.length);\n  const { cats, ids } = categorias(itens, 'sg:');\n  const usados = new Set(), epUsados = new Set(), lista = [], detalhes = new Map(), epUrl = new Map();\n  itens.forEach(s => {\n    const g = String(s.grupo || 'Outros').trim(), cat = ids.get(g);\n    const sid = idUnico(300000 + fnv('s:' + norm(s.nome) + '|' + norm(g)) % 600000, usados);\n    const info = {\n      num: lista.length + 1, name: s.nome, series_id: sid, cover: s.logo || '', plot: s.sinopse || '',\n      cast: '', director: '', genre: '', releaseDate: '', release_date: '', last_modified: '0',\n      rating: '0', rating_5based: 0, backdrop_path: [], youtube_trailer: '', episode_run_time: '0',\n      category_id: String(cat), category_ids: [cat]\n    };\n    lista.push(info);\n    const porTemp = {};\n    s.episodios.forEach(e => {\n      if (!e || !e.url) return;\n      const t = parseInt(e.temporada, 10) || 1, n = parseInt(e.episodio, 10) || 1;\n      const eid = idUnico(1000000 + fnv('e:' + sid + '|' + t + '|' + n) % 8000000, epUsados);\n      epUrl.set(eid, e.url);\n      (porTemp[t] = porTemp[t] || []).push({\n        id: String(eid), episode_num: n, title: e.titulo || `Episódio ${n}`, container_extension: extensao(e.url),\n        info: { movie_image: s.logo || '', plot: '', duration_secs: 0, duration: '' },\n        custom_sid: '', added: '0', season: t, direct_source: ''\n      });\n    });\n    Object.values(porTemp).forEach(l => l.sort((a, b) => a.episode_num - b.episode_num));\n    const temporadas = Object.keys(porTemp).map(Number).sort((a, b) => a - b).map(t => ({\n      air_date: '', episode_count: porTemp[t].length, id: t, name: `Temporada ${t}`, overview: '',\n      season_number: t, cover: s.logo || '', cover_big: s.logo || ''\n    }));\n    detalhes.set(sid, { seasons: temporadas, info: { ...info }, episodes: porTemp });\n  });\n  return { cats, lista, detalhes, epUrl };\n}\nexport const VOD = montarFilmes();\nexport const SER = montarSeries();\n\nexport function fimDoDia(data) {\n  const m = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(data || '');\n  if (!m) return null;\n  return Date.UTC(+m[1], +m[2] - 1, +m[3], 26, 59, 59); // 23:59:59 no horario de Brasilia\n}\nexport function autenticar(usuario, senha) {\n  if (!usuario || !senha) return null;\n  const u = USUARIOS.find(x => x && x.usuario === usuario && x.senha === senha);\n  if (!u || u.ativo === false) return null;\n  const fim = fimDoDia(u.validade);\n  if (fim && Date.now() > fim) return null;\n  return u;\n}\nexport const json = (obj, status = 200) => new Response(JSON.stringify(obj), {\n  status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }\n});\nexport const texto = (msg, status = 200, tipo = 'text/plain; charset=utf-8') => new Response(msg, {\n  status, headers: { 'Content-Type': tipo, 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' }\n});\nexport const publico = s => Object.fromEntries(Object.entries(s).filter(([k]) => !k.startsWith('_')));\n", "extensao-verificador/manifest.json": "{\n  \"manifest_version\": 3,\n  \"name\": \"Verificador de Canais do Montador\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Confere se os canais do Montador de Lista M3U estão transmitindo, do jeito que um app IPTV faria.\",\n  \"host_permissions\": [\"<all_urls>\"],\n  \"permissions\": [\"declarativeNetRequestWithHostAccess\"],\n  \"background\": { \"service_worker\": \"verificador.js\" },\n  \"content_scripts\": [\n    { \"matches\": [\"file:///*montador*\"], \"js\": [\"ponte.js\"], \"run_at\": \"document_idle\" }\n  ]\n}\n", "extensao-verificador/ponte.js": "// Ponte entre a pagina do Montador e a extensao. So roda em arquivos locais com \"montador\" no caminho.\n(function () {\n  const versao = chrome.runtime.getManifest().version;\n  const ola = () => window.postMessage({ src: 'ext-verificador', tipo: 'ola', versao }, '*');\n  window.addEventListener('message', ev => {\n    if (ev.source !== window || !ev.data || ev.data.src !== 'montador') return;\n    const m = ev.data;\n    if (m.tipo === 'ping') { ola(); return; }\n    if (m.tipo === 'verificar' && typeof m.url === 'string') {\n      chrome.runtime.sendMessage({ tipo: 'verificar', url: m.url, kind: m.kind }, res => {\n        const erro = chrome.runtime.lastError;\n        window.postMessage({ src: 'ext-verificador', tipo: 'resultado', id: m.id, res: erro || !res ? { s: 'unk', d: 'A extensão não respondeu.' } : res }, '*');\n      });\n    }\n  });\n  ola();\n})();\n", "extensao-verificador/verificador.js": "// Verifica se um canal esta transmitindo: lista -> qualidade -> trecho de video -> lista andando (ao vivo).\nconst UA = 'VLC/3.0.21 LibVLC/3.0.21';\n\n// Faz os pedidos da extensao parecerem os de um player (sem Origin/Referer de navegador).\nasync function regras() {\n  try {\n    await chrome.declarativeNetRequest.updateSessionRules({\n      removeRuleIds: [1],\n      addRules: [{\n        id: 1, priority: 1,\n        action: { type: 'modifyHeaders', requestHeaders: [\n          { header: 'user-agent', operation: 'set', value: UA },\n          { header: 'origin', operation: 'remove' },\n          { header: 'referer', operation: 'remove' }\n        ] },\n        condition: { tabIds: [-1], resourceTypes: ['xmlhttprequest', 'other', 'media'] }\n      }]\n    });\n  } catch (e) {}\n}\nchrome.runtime.onInstalled.addListener(regras);\nchrome.runtime.onStartup.addListener(regras);\nregras();\n\nconst dormir = ms => new Promise(r => setTimeout(r, ms));\nconst texto = b => new TextDecoder().decode(b);\n\nasync function baixar(url, ms, max) {\n  const ctl = new AbortController();\n  const t = setTimeout(() => ctl.abort(), ms);\n  try {\n    const r = await fetch(url, { cache: 'no-store', credentials: 'omit', signal: ctl.signal });\n    let buf = new Uint8Array(0);\n    if (r.ok && r.body) {\n      const rd = r.body.getReader();\n      while (buf.length < max) {\n        const { done, value } = await rd.read();\n        if (done) break;\n        const n = new Uint8Array(buf.length + value.length); n.set(buf); n.set(value, buf.length); buf = n;\n      }\n      try { rd.cancel(); } catch (e) {}\n    }\n    return { r, buf, url: r.url || url };\n  } finally { clearTimeout(t); ctl.abort(); }\n}\nconst semResposta = (e, alvo) => ({ s: 'off', d: e && e.name === 'AbortError' ? `${alvo} não respondeu a tempo.` : `${alvo} não responde (fora do ar ou link errado).` });\nconst segmentos = txt => [...txt.matchAll(/#EXTINF[^\\n]*\\n\\s*([^#\\s][^\\n]*)/g)].map(m => m[1].trim());\nconst sequencia = txt => (txt.match(/#EXT-X-MEDIA-SEQUENCE:\\s*(\\d+)/) || [])[1] || '';\n\nasync function verificar(url, kind) {\n  if (!/^https?:\\/\\//i.test(url)) return { s: 'unk', d: 'Links RTMP/UDP não podem ser verificados.' };\n  let p;\n  try { p = await baixar(url, 12000, 262144); } catch (e) { return semResposta(e, 'O canal'); }\n  if (!p.r.ok) return { s: 'off', d: `O canal respondeu com erro ${p.r.status}.` };\n  if (!p.buf.length) return { s: 'off', d: 'O canal respondeu vazio.' };\n  let lista = texto(p.buf);\n  if (!/^\\s*#EXTM3U/.test(lista)) {\n    if (/^\\s*<\/.test(lista)) return { s: 'off', d: 'O link abre uma página, não um vídeo.' };\n    return { s: 'ok', d: 'O canal está enviando vídeo.' };\n  }\n  let base = p.url, listaUrl = p.url;\n  if (/#EXT-X-STREAM-INF/.test(lista)) {\n    const vars = [...lista.matchAll(/#EXT-X-STREAM-INF:([^\\n]*)\\n\\s*([^#\\s][^\\n]*)/g)]\n      .map(m => ({ bw: parseInt((m[1].match(/BANDWIDTH=(\\d+)/) || [])[1] || '0', 10), uri: m[2].trim() }))\n      .sort((a, b) => a.bw - b.bw);\n    if (!vars.length) return { s: 'off', d: 'A lista do canal está sem vídeo.' };\n    listaUrl = new URL(vars[0].uri, base).href;\n    try { p = await baixar(listaUrl, 12000, 524288); } catch (e) { return semResposta(e, 'A qualidade de vídeo'); }\n    if (!p.r.ok) return { s: 'off', d: `A qualidade de vídeo dá erro ${p.r.status}.` };\n    lista = texto(p.buf); base = listaUrl = p.url;\n  }\n  const segs = segmentos(lista);\n  if (!segs.length) return { s: 'off', d: 'A lista do canal está sem vídeo.' };\n  const seg = new URL(segs[segs.length - 1], base).href;\n  let s;\n  try { s = await baixar(seg, 15000, 4096); } catch (e) { return semResposta(e, 'O vídeo do canal'); }\n  if (!s.r.ok) return { s: 'off', d: `O vídeo do canal dá erro ${s.r.status}.` };\n  if (!s.buf.length) return { s: 'off', d: 'O vídeo do canal veio vazio.' };\n  if (/#EXT-X-ENDLIST/.test(lista)) return { s: 'ok', d: 'Vídeo disponível (gravado, não é ao vivo).' };\n  if (kind && kind !== 'live') return { s: 'ok', d: 'O vídeo respondeu corretamente.' };\n\n  // Ao vivo (kind === 'live'): a lista precisa andar (novos trechos chegando).\n  const seq0 = sequencia(lista), ult0 = segs[segs.length - 1];\n  const td = Math.min(Math.max(parseFloat((lista.match(/#EXT-X-TARGETDURATION:\\s*([\\d.]+)/) || [])[1]) || 6, 2), 10);\n  for (let i = 0; i < 2; i++) {\n    await dormir((td + 1) * 1000);\n    try {\n      const q = await baixar(listaUrl, 12000, 524288);\n      if (!q.r.ok) continue;\n      const l2 = texto(q.buf), s2 = segmentos(l2);\n      if (sequencia(l2) !== seq0 || (s2.length && s2[s2.length - 1] !== ult0)) return { s: 'ok', d: 'Transmitindo ao vivo.' };\n    } catch (e) {}\n  }\n  return { s: 'off', d: 'A transmissão está parada: a lista do canal não recebe vídeo novo.' };\n}\n\nchrome.runtime.onMessage.addListener((msg, _sender, responder) => {\n  if (msg && msg.tipo === 'verificar' && typeof msg.url === 'string') {\n    verificar(msg.url, msg.kind).then(responder, () => responder({ s: 'unk', d: 'Não deu para verificar.' }));\n    return true;\n  }\n  return false;\n});\n", "extensao-verificador/LEIA-ME.txt": "VERIFICADOR DE CANAIS (extensao do Chrome/Edge para o Montador)\n\nCom a extensao, a bolinha verde quer dizer que o canal esta TRANSMITINDO:\na lista responde, o video chega e, se for ao vivo, novos trechos estao entrando.\nEla ignora as travas que o navegador tem e confere o canal como um app faria.\n\nINSTALAR (uma vez so)\n1. No Chrome, abra chrome://extensions  (no Edge: edge://extensions)\n2. Ligue o \"Modo do desenvolvedor\" (canto superior direito).\n3. Clique em \"Carregar sem compactacao\" e escolha esta pasta (extensao-verificador).\n4. Na extensao que apareceu, clique em \"Detalhes\" e ligue\n   \"Permitir acesso a URLs de arquivo\". SEM ISSO ELA NAO FUNCIONA.\n5. Abra (ou recarregue) o montador.html. A legenda de Canais por grupo\n   passa a dizer \"Verificacao completa pela extensao\".\n\nA extensao so conversa com arquivos locais que tenham \"montador\" no nome ou na pasta.\n", "netlify/functions/xtream-get.mjs": "// Lista M3U com login: /get.php?username=...&password=...&type=m3u_plus\nimport { DATA, EPG, autenticar, texto } from '../lib/comum.mjs';\n\nconst attr = s => String(s || '').replace(/\"/g, \"'\");\nexport default async (req) => {\n  const url = new URL(req.url), q = url.searchParams;\n  const u = autenticar(q.get('username'), q.get('password'));\n  if (!u) return texto('Acesso negado', 403);\n  const base = `https://${url.host}/live/${encodeURIComponent(u.usuario)}/${encodeURIComponent(u.senha)}/`;\n  const ext = q.get('output') === 'ts' ? 'ts' : 'm3u8';\n  const nomes = new Map(DATA.cats.map(c => [c.category_id, c.category_name]));\n  const linhas = [EPG ? `#EXTM3U x-tvg-url=\"${attr(EPG)}\"` : '#EXTM3U'];\n  DATA.streams.forEach(s => {\n    linhas.push(`#EXTINF:-1 tvg-id=\"${attr(s.epg_channel_id)}\" tvg-name=\"${attr(s.name)}\" tvg-logo=\"${attr(s.stream_icon)}\" group-title=\"${attr(nomes.get(s.category_id))}\",${s.name}`);\n    linhas.push(`${base}${s.stream_id}.${ext}`);\n  });\n  return texto(linhas.join('\\n') + '\\n', 200, 'audio/x-mpegurl; charset=utf-8');\n};\n\nexport const config = { path: '/get.php' };\n", "netlify/functions/xtream-live.mjs": "// Abre um canal: /live/USUARIO/SENHA/ID.m3u8 (ou .ts) -> manda o app para o link original.\nimport { DATA, autenticar, texto } from '../lib/comum.mjs';\n\nexport default async (req, context) => {\n  const p = context.params || {};\n  let { u, p: senha, f } = p;\n  if (!u || !senha || !f) {\n    const m = new URL(req.url).pathname.match(/\\/(?:live\\/)?([^/]+)\\/([^/]+)\\/([^/]+)$/);\n    if (m) [, u, senha, f] = m;\n  }\n  u = decodeURIComponent(u || ''); senha = decodeURIComponent(senha || '');\n  if (!autenticar(u, senha)) return texto('Acesso negado', 403);\n  const id = parseInt(String(f || '').split('.')[0], 10);\n  const s = DATA.streams.find(x => x.stream_id === id);\n  if (!s) return texto('Canal não encontrado', 404);\n  return new Response(null, { status: 302, headers: { Location: s._url, 'Cache-Control': 'no-store' } });\n};\n\nexport const config = { path: '/live/:u/:p/:f' };\n", "netlify/functions/xtream-player_api.mjs": "// Login do IPTV Smarters (padrao Xtream Codes): /player_api.php\nimport { DATA, VOD, SER, autenticar, fimDoDia, json, publico } from '../lib/comum.mjs';\n\nexport default async (req) => {\n  const url = new URL(req.url), q = url.searchParams;\n  const u = autenticar(q.get('username'), q.get('password'));\n  if (!u) return json({ user_info: { auth: 0, status: 'Disabled', message: 'Usuário ou senha inválidos' } });\n\n  const acao = q.get('action') || '';\n  if (!acao) {\n    const agora = new Date(), fim = fimDoDia(u.validade);\n    return json({\n      user_info: {\n        username: u.usuario, password: u.senha, message: u.nome ? `Olá, ${u.nome}` : '',\n        auth: 1, status: 'Active', exp_date: fim ? String(Math.floor(fim / 1000)) : null,\n        is_trial: '0', active_cons: '0', created_at: '0', max_connections: String(u.conexoes || 3),\n        allowed_output_formats: ['m3u8', 'ts']\n      },\n      server_info: {\n        url: url.hostname, port: '443', https_port: '443', server_protocol: 'https', rtmp_port: '0',\n        timezone: 'America/Sao_Paulo', timestamp_now: Math.floor(agora.getTime() / 1000),\n        time_now: agora.toISOString().replace('T', ' ').slice(0, 19)\n      }\n    });\n  }\n  switch (acao) {\n    case 'get_live_categories': return json(DATA.cats);\n    case 'get_live_streams': {\n      const cat = q.get('category_id');\n      return json((cat ? DATA.streams.filter(s => s.category_id === cat) : DATA.streams).map(publico));\n    }\n    case 'get_short_epg': case 'get_simple_data_table': return json({ epg_listings: [] });\n    case 'get_vod_categories': return json(VOD.cats);\n    case 'get_vod_streams': {\n      const cat = q.get('category_id');\n      return json((cat ? VOD.lista.filter(s => s.category_id === cat) : VOD.lista).map(publico));\n    }\n    case 'get_vod_info': {\n      const f = VOD.porId.get(parseInt(q.get('vod_id'), 10));\n      if (!f) return json({ info: {}, movie_data: {} });\n      return json({\n        info: {\n          name: f.name, o_name: f.name, cover_big: f.stream_icon, movie_image: f.stream_icon, releasedate: f._ano,\n          youtube_trailer: '', director: '', actors: '', cast: '', description: f._sinopse, plot: f._sinopse,\n          age: '', country: '', genre: '', duration_secs: 0, duration: '', rating: '', tmdb_id: ''\n        },\n        movie_data: { stream_id: f.stream_id, name: f.name, added: '0', category_id: f.category_id, container_extension: f.container_extension, custom_sid: '', direct_source: '' }\n      });\n    }\n    case 'get_series_categories': return json(SER.cats);\n    case 'get_series': {\n      const cat = q.get('category_id');\n      return json(cat ? SER.lista.filter(s => s.category_id === cat) : SER.lista);\n    }\n    case 'get_series_info': {\n      const d = SER.detalhes.get(parseInt(q.get('series_id'), 10));\n      return json(d || { seasons: [], info: {}, episodes: {} });\n    }\n    default: return json([]);\n  }\n};\n\nexport const config = { path: '/player_api.php' };\n", "netlify/functions/xtream-vod.mjs": "// Abre filme ou episodio: /movie/USUARIO/SENHA/ID.mp4 e /series/USUARIO/SENHA/ID.mp4\nimport { VOD, SER, autenticar, texto } from '../lib/comum.mjs';\n\nexport default async (req, context) => {\n  const caminho = new URL(req.url).pathname;\n  const p = context.params || {};\n  let { u, p: senha, f } = p;\n  if (!u || !senha || !f) {\n    const m = caminho.match(/\\/(?:movie|series)\\/([^/]+)\\/([^/]+)\\/([^/]+)$/);\n    if (m) [, u, senha, f] = m;\n  }\n  u = decodeURIComponent(u || ''); senha = decodeURIComponent(senha || '');\n  if (!autenticar(u, senha)) return texto('Acesso negado', 403);\n  const id = parseInt(String(f || '').split('.')[0], 10);\n  const url = caminho.startsWith('/series/') ? SER.epUrl.get(id) : (VOD.porId.get(id) || {})._url;\n  if (!url) return texto('Vídeo não encontrado', 404);\n  return new Response(null, { status: 302, headers: { Location: url, 'Cache-Control': 'no-store' } });\n};\n\nexport const config = { path: ['/movie/:u/:p/:f', '/series/:u/:p/:f'] };\n", "netlify/functions/xtream-xmltv.mjs": "// Guia de programacao: /xmltv.php -> usa o EPG configurado no Montador, se houver.\nimport { EPG, autenticar, texto } from '../lib/comum.mjs';\n\nexport default async (req) => {\n  const q = new URL(req.url).searchParams;\n  if (!autenticar(q.get('username'), q.get('password'))) return texto('Acesso negado', 403);\n  if (EPG) return new Response(null, { status: 302, headers: { Location: EPG } });\n  return texto('<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\n<tv><\/tv>\\n', 200, 'application/xml; charset=utf-8');\n};\n\nexport const config = { path: '/xmltv.php' };\n"}/*SRV*/;
+const SKEY = 'montador-servidor-v1';
+let srv = {usuarios: [], site: ''}, usrEditing = null, saver = null;
+try { const s = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (s && Array.isArray(s.usuarios)) srv = Object.assign(srv, s); } catch(e) {}
+const saveSrv = () => { try { localStorage.setItem(SKEY, JSON.stringify(srv)); } catch(e) {} if (typeof onDataChange === 'function') onDataChange(); };
+const USR_RE = /^[A-Za-z0-9._-]{3,32}$/;
+function gerarSenha(){ const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; const r = new Uint32Array(10); crypto.getRandomValues(r); return Array.from(r, n => abc[n % abc.length]).join(''); }
+function fmtData(d){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : '—'; }
+function vencido(d){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); return m ? Date.now() > Date.UTC(+m[1], +m[2]-1, +m[3], 26, 59, 59) : false; }
+function renderUsers(){
+  $('usrCount').textContent = srv.usuarios.length ? String(srv.usuarios.length) : '';
+  const body = $('usrBody'); body.textContent = '';
+  srv.usuarios.forEach((u, i) => {
+    const tr = document.createElement('tr');
+    if (u.ativo === false || vencido(u.validade)) tr.className = 'off';
+    tr.innerHTML = `<td class="mono"></td><td class="mono"></td><td></td><td></td><td><input type="checkbox" aria-label="Ativo"></td><td style="white-space:nowrap"><button class="icon" type="button" data-u="copy">Copiar acesso</button><button class="icon" type="button" data-u="edit">Editar</button><button class="icon del" type="button" data-u="del">Excluir</button></td>`;
+    tr.children[0].textContent = u.usuario;
+    tr.children[1].textContent = u.senha;
+    tr.children[2].textContent = u.nome || '—';
+    tr.children[3].textContent = fmtData(u.validade) + (vencido(u.validade) ? ' (vencido)' : '');
+    const cb = tr.querySelector('input'); cb.checked = u.ativo !== false;
+    cb.addEventListener('change', () => { u.ativo = cb.checked; saveSrv(); renderUsers(); flash(`${u.usuario} ${cb.checked ? 'ativado' : 'desativado'}. Baixe e publique o servidor de novo para valer.`); });
+    tr.dataset.i = i; body.appendChild(tr);
+  });
+  if (!srv.usuarios.length) {
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 6; td.className = 'empty'; td.textContent = 'Nenhum usuário ainda. Crie um acesso para cada pessoa da família.';
+    tr.appendChild(td); body.appendChild(tr);
+  }
+}
+function resetUsrForm(){ usrEditing = null; ['uUser','uPass','uNome','uVal'].forEach(id => $(id).value = ''); $('uSave').textContent = 'Adicionar'; $('uCancel').hidden = true; $('uErr').textContent = ''; }
+$('uGen').addEventListener('click', () => { $('uPass').value = gerarSenha(); });
+$('uCancel').addEventListener('click', resetUsrForm);
+$('usrForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const usuario = $('uUser').value.trim(), senha = $('uPass').value.trim(), nome = clean($('uNome').value), validade = $('uVal').value;
+  const errs = [];
+  if (!USR_RE.test(usuario)) errs.push('Usuário: de 3 a 32 caracteres, só letras sem acento, números, ponto, hífen ou sublinhado.');
+  if (!USR_RE.test(senha) || senha.length < 6) errs.push('Senha: de 6 a 32 caracteres, só letras sem acento, números, ponto, hífen ou sublinhado. Use "Gerar" para criar uma.');
+  if (srv.usuarios.some((u, i) => u.usuario.toLowerCase() === usuario.toLowerCase() && i !== usrEditing)) errs.push(`Já existe o usuário "${usuario}".`);
+  if (errs.length) { $('uErr').textContent = errs.join(' '); return; }
+  const data = {usuario, senha, nome, validade, ativo: true};
+  if (usrEditing !== null) { data.ativo = srv.usuarios[usrEditing].ativo !== false; srv.usuarios[usrEditing] = data; flash(`Acesso de ${usuario} atualizado. Baixe e publique o servidor de novo para valer.`); }
+  else { srv.usuarios.push(data); flash(`Acesso de ${usuario} criado.`); }
+  saveSrv(); resetUsrForm(); renderUsers();
+});
+$('usrBody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-u]'); if (!b) return;
+  const i = +b.closest('tr').dataset.i, u = srv.usuarios[i]; if (!u) return;
+  if (b.dataset.u === 'edit') {
+    usrEditing = i; $('uUser').value = u.usuario; $('uPass').value = u.senha; $('uNome').value = u.nome || ''; $('uVal').value = u.validade || '';
+    $('uSave').textContent = 'Salvar'; $('uCancel').hidden = false; $('uUser').focus();
+  }
+  if (b.dataset.u === 'del') {
+    if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = 'Confirmar'; setTimeout(() => { if (b.isConnected) { b.classList.remove('armed'); b.textContent = 'Excluir'; } }, 4000); return; }
+    srv.usuarios.splice(i, 1); saveSrv(); resetUsrForm(); renderUsers(); flash(`Usuário ${u.usuario} excluído. Baixe e publique o servidor de novo para valer.`);
+  }
+  if (b.dataset.u === 'copy') {
+    const site = (clean(srv.site) || 'https://SEU-SITE.netlify.app').replace(/\/+$/, '');
+    const txt = `TV da Família\nNo IPTV Smarters, escolha "Login with Xtream Codes API":\nAny Name: TV da Família\nUsername: ${u.usuario}\nPassword: ${u.senha}\nURL: ${site}`;
+    const fail = () => flash('Não consegui copiar: ' + txt.replace(/\n/g, ' · '), true);
+    try { navigator.clipboard.writeText(txt).then(() => flash(`Dados de acesso de ${u.usuario} copiados. É só colar no WhatsApp.`), fail); } catch(err) { fail(); }
+  }
+});
+$('uSite').value = srv.site || '';
+$('uSite').addEventListener('input', () => { srv.site = $('uSite').value.trim(); saveSrv(); });
+function canaisJson(){
+  const canais = [], filmes = [], series = [];
+  groupLists(false).forEach(([g, list]) => list.filter(c => !c.fora).forEach(c => canais.push({nome: c.name, grupo: g, url: c.url, logo: c.logo || '', epg: c.tvgId || ''})));
+  vodGroups('movie').forEach(g => state.movies.filter(m => m.group === g && !m.fora).forEach(m => filmes.push({nome: m.name, grupo: g, url: m.url, logo: m.logo || '', ano: m.year || '', sinopse: m.plot || ''})));
+  vodGroups('series').forEach(g => state.series.filter(s => s.group === g && s.episodes.some(x => !x.fora)).forEach(s => series.push({
+    nome: s.name, grupo: g, logo: s.logo || '', sinopse: s.plot || '',
+    episodios: s.episodes.filter(x => !x.fora).sort((a, b) => epKey(a) - epKey(b)).map(x => ({temporada: x.season, episodio: x.ep, titulo: x.title || '', url: x.url}))
+  })));
+  return JSON.stringify({epg: state.opts.epg.trim(), canais, filmes, series}, null, 2);
+}
+function usuariosJson(){
+  return JSON.stringify(srv.usuarios.map(u => ({usuario: u.usuario, senha: u.senha, nome: u.nome || '', validade: u.validade || '', ativo: u.ativo !== false})), null, 2);
+}
+async function buildServerZip(){
+  const zip = new JSZip(), f = zip.folder('servidor-tv-familia');
+  Object.entries(SERVER_FILES).forEach(([p, c]) => f.file(p, p.endsWith('.bat') ? c.replace(/\r?\n/g, '\r\n') : c));
+  if (typeof SELF_HTML === 'string') f.file('montador.html', SELF_HTML);
+  f.file('dados/canais.json', canaisJson());
+  f.file('dados/usuarios.json', usuariosJson());
+  return zip.generateAsync({type: 'blob'});
+}
+$('dlSrv').addEventListener('click', async () => {
+  if (!srv.usuarios.some(u => u.ativo !== false)) { flash('Crie pelo menos um usuário ativo antes de baixar o servidor.', true); $('uUser').focus(); return; }
+  if (!saver) return;
+  try {
+    const blob = await buildServerZip();
+    await saver('servidor-tv-familia.zip', blob);
+    const n = state.channels.filter(c => c.group).length;
+    flash(`Servidor baixado com ${n} canais e ${srv.usuarios.length} usuários. Extraia e rode o publicar.bat.`);
+  } catch(err) { if (!(err && err.code === 'declined')) flash('Não foi possível gerar o pacote do servidor.', true); }
+});
+renderUsers();
+
+/* ================= pasta do servidor ================= */
+let dirHandle = null, folderTimer = null, folderReady = false;
+const hasFS = typeof window.showDirectoryPicker === 'function';
+function idbOpen(){ return new Promise((res, rej) => { const r = indexedDB.open('montador-pasta', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function idbGet(){ try { const d = await idbOpen(); return await new Promise(res => { const t = d.transaction('h').objectStore('h').get('dir'); t.onsuccess = () => res(t.result || null); t.onerror = () => res(null); }); } catch(e) { return null; } }
+async function idbSet(v){ try { const d = await idbOpen(); d.transaction('h', 'readwrite').objectStore('h').put(v, 'dir'); } catch(e) {} }
+async function readJson(dir, name){ try { const f = await (await dir.getFileHandle(name)).getFile(); return JSON.parse(await f.text()); } catch(e) { return undefined; } }
+async function writeText(dir, name, text){ const w = await (await dir.getFileHandle(name, {create: true})).createWritable(); await w.write(text); await w.close(); }
+function setFolder(txt, ok, btnLabel){
+  $('folderBar').hidden = false;
+  $('folderTxt').textContent = txt;
+  const s = $('folderState'); s.classList.toggle('on', ok === true); s.classList.toggle('off', ok === false);
+  $('folderBar').classList.toggle('warn', ok === false);
+  $('folderBtn').hidden = !btnLabel; if (btnLabel) $('folderBtn').textContent = btnLabel;
+  $('folderSwap').hidden = !folderReady;
+}
+const hora = () => new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+async function writeFolder(){
+  if (!dirHandle || !folderReady) return;
+  try {
+    const dados = await dirHandle.getDirectoryHandle('dados', {create: true});
+    await writeText(dados, 'canais.json', canaisJson());
+    await writeText(dados, 'usuarios.json', usuariosJson());
+    await writeText(dados, 'montador.json', JSON.stringify({versao: 1, canais: state.channels, grupos: state.groupOrder, opcoes: state.opts, site: srv.site, usuarios: srv.usuarios, saude: health, saudeEm: healthWhen, filmes: state.movies, filmesGrupos: state.movieGroups, series: state.series, seriesGrupos: state.seriesGroups}, null, 2));
+    await writeText(dados, 'catalogo.json', JSON.stringify(catalog, null, 2));
+    setFolder(`Salvo na pasta "${dirHandle.name}" às ${hora()}. Para colocar no ar, rode o publicar.bat.`, true);
+  } catch(e) {
+    folderReady = false;
+    setFolder('Não consegui salvar na pasta do servidor. Clique em "Reconectar pasta".', false, 'Reconectar pasta');
+  }
+}
+function onDataChange(){ if (!folderReady) return; clearTimeout(folderTimer); folderTimer = setTimeout(writeFolder, 600); }
+async function connectFolder(h){
+  try { await h.getFileHandle('netlify.toml'); }
+  catch(e) { setFolder('Essa pasta não é a do servidor (falta o arquivo netlify.toml). Escolha a pasta onde está o publicar.bat.', false, 'Abrir pasta do servidor'); return; }
+  dirHandle = h; await idbSet(h);
+  const dados = await h.getDirectoryHandle('dados', {create: true});
+  const m = await readJson(dados, 'montador.json');
+  if (m && Array.isArray(m.canais)) {
+    state.channels = m.canais; state.groupOrder = Array.isArray(m.grupos) ? m.grupos : [];
+    state.opts = Object.assign({sort:false, gap:true, title:false, epg:''}, m.opcoes || {});
+    srv.usuarios = Array.isArray(m.usuarios) ? m.usuarios : []; srv.site = m.site || '';
+    state.movies = Array.isArray(m.filmes) ? m.filmes : []; state.movieGroups = Array.isArray(m.filmesGrupos) ? m.filmesGrupos : [];
+    state.series = Array.isArray(m.series) ? m.series : []; state.seriesGroups = Array.isArray(m.seriesGrupos) ? m.seriesGrupos : [];
+    if (m.saude && typeof m.saude === 'object' && (m.saudeEm || 0) >= healthWhen) { health = m.saude; healthWhen = m.saudeEm || 0; saveHealth(); updateLegend(); }
+  } else {
+    const cj = await readJson(dados, 'canais.json'), uj = await readJson(dados, 'usuarios.json');
+    const lista = cj ? (Array.isArray(cj) ? cj : (cj.canais || [])) : [];
+    if (!state.channels.length && lista.length) { lista.forEach(c => addChannel({name: c.nome, group: c.grupo, url: c.url, logo: c.logo, tvgId: c.epg})); if (cj.epg) state.opts.epg = cj.epg; }
+    if (!srv.usuarios.length && Array.isArray(uj)) srv.usuarios = uj;
+  }
+  const cat = await readJson(dados, 'catalogo.json');
+  if (Array.isArray(cat) && cat.length) { catalog = cat; try { localStorage.setItem(KEYC, JSON.stringify(catalog)); } catch(e) {} rebuildIndex(); }
+  folderReady = true;
+  $('oSort').checked = state.opts.sort; $('oGap').checked = state.opts.gap; $('oTitle').checked = state.opts.title; $('oEpg').value = state.opts.epg;
+  $('uSite').value = srv.site || '';
+  resetForm(); render(); renderUsers(); renderCatalog();
+  saveSrv();
+  await writeFolder();
+}
+async function pickFolder(){
+  try { await connectFolder(await window.showDirectoryPicker({id: 'servidor-tv', mode: 'readwrite'})); }
+  catch(e) { if (e && e.name !== 'AbortError') setFolder('Não consegui abrir a pasta. Tente de novo.', false, 'Abrir pasta do servidor'); }
+}
+$('folderSwap').addEventListener('click', pickFolder);
+$('folderBtn').addEventListener('click', async () => {
+  const h = await idbGet();
+  if (h && !folderReady && $('folderBtn').textContent.startsWith('Reconectar')) {
+    try { if (await h.requestPermission({mode: 'readwrite'}) === 'granted') { await connectFolder(h); return; } } catch(e) {}
+  }
+  pickFolder();
+});
+async function setupFolder(){
+  if (!hasFS) { setFolder('Para o Montador salvar direto na pasta do servidor, abra este arquivo no Chrome ou no Edge. Neste navegador, use "Baixar servidor (.zip)".', null); return; }
+  const h = await idbGet();
+  if (!h) { setFolder('Abra a pasta do servidor para o Montador salvar os canais e usuários direto nela.', null, 'Abrir pasta do servidor'); return; }
+  let perm = 'prompt';
+  try { perm = await h.queryPermission({mode: 'readwrite'}); } catch(e) {}
+  if (perm === 'granted') { await connectFolder(h); return; }
+  setFolder(`Clique em "Reconectar pasta" para voltar a salvar em "${h.name}". Faça isso antes de editar: ao reconectar, o Montador carrega o que está salvo na pasta.`, false, 'Reconectar pasta');
+}
+
+/* ================= início ================= */
+load();
+bindOpt('oSort', 'sort', 'checked'); bindOpt('oGap', 'gap', 'checked'); bindOpt('oTitle', 'title', 'checked'); bindOpt('oEpg', 'epg', 'value');
+setCtab(ctab); renderCatalog();
+setupDownloads(); setupDb(); setupFolder();
+})();
+</script></body></html>

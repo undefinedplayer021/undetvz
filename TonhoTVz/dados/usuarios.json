@@ -1,0 +1,16 @@
+[
+  {
+    "usuario": "PATRICIA",
+    "senha": "pajumc05",
+    "nome": "",
+    "validade": "2026-10-25",
+    "ativo": true
+  },
+  {
+    "usuario": "MARIAP",
+    "senha": "Maria123",
+    "nome": "",
+    "validade": "",
+    "ativo": true
+  }
+]

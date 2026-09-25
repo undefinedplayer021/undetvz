@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Verificador de Canais do Montador",
+  "version": "1.0.0",
+  "description": "Confere se os canais do Montador de Lista M3U estão transmitindo, do jeito que um app IPTV faria.",
+  "host_permissions": ["<all_urls>"],
+  "permissions": ["declarativeNetRequestWithHostAccess"],
+  "background": { "service_worker": "verificador.js" },
+  "content_scripts": [
+    { "matches": ["file:///*montador*"], "js": ["ponte.js"], "run_at": "document_idle" }
+  ]
+}

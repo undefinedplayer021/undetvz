@@ -1,0 +1,1533 @@
+[
+  {
+    "id": "globo",
+    "nome": "Globo",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "rede globo",
+      "tv globo",
+      "globo sp",
+      "globo rj",
+      "globo hd",
+      "globo minas",
+      "eptv",
+      "rbs tv",
+      "tv bahia",
+      "tv anhanguera",
+      "nsc tv",
+      "tv tem",
+      "tv vanguarda",
+      "inter tv",
+      "tv integracao",
+      "tv mirante",
+      "tv verdes mares",
+      "tv gazeta es",
+      "tv tribuna",
+      "tv liberal",
+      "tv amazonica",
+      "tv clube pe",
+      "tv globo nordeste"
+    ]
+  },
+  {
+    "id": "sbt",
+    "nome": "SBT",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "sbt sp",
+      "sbt rj",
+      "sbt hd",
+      "sbt rs",
+      "sbt pb",
+      "sbt pi",
+      "sbt caruaru",
+      "tv tambau",
+      "tv alterosa",
+      "tv jornal",
+      "tv cidade verde"
+    ]
+  },
+  {
+    "id": "record",
+    "nome": "Record",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "record tv",
+      "rede record",
+      "tv record",
+      "record sp",
+      "record rj",
+      "record hd",
+      "record pb",
+      "tv vitoria record",
+      "tv itapoan"
+    ]
+  },
+  {
+    "id": "band",
+    "nome": "Band",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "rede bandeirantes",
+      "tv bandeirantes",
+      "band sp",
+      "band rj",
+      "band hd",
+      "band para",
+      "band minas",
+      "band rs"
+    ]
+  },
+  {
+    "id": "redetv",
+    "nome": "RedeTV!",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "redetv",
+      "rede tv",
+      "redetv hd",
+      "rede tv pr"
+    ]
+  },
+  {
+    "id": "tv-cultura",
+    "nome": "TV Cultura",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "cultura",
+      "tv cultura sp",
+      "tv cultura hd"
+    ]
+  },
+  {
+    "id": "tv-brasil",
+    "nome": "TV Brasil",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv brasil hd",
+      "ebc"
+    ]
+  },
+  {
+    "id": "tv-gazeta",
+    "nome": "TV Gazeta",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "gazeta",
+      "tv gazeta sp"
+    ]
+  },
+  {
+    "id": "cnt",
+    "nome": "CNT",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "rede cnt"
+    ]
+  },
+  {
+    "id": "rede-brasil",
+    "nome": "Rede Brasil",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "rede brasil de televisao",
+      "rbtv"
+    ]
+  },
+  {
+    "id": "rede-meio-norte",
+    "nome": "Rede Meio Norte",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "meio norte",
+      "tv meio norte"
+    ]
+  },
+  {
+    "id": "tv-diario",
+    "nome": "TV Diário",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv diario"
+    ]
+  },
+  {
+    "id": "amazon-sat",
+    "nome": "Amazon Sat",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "amazonsat"
+    ]
+  },
+  {
+    "id": "rede-familia",
+    "nome": "Rede Família",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": [
+      "rede familia",
+      "familia"
+    ]
+  },
+  {
+    "id": "canal-21",
+    "nome": "Canal 21",
+    "grupo": "TV Aberta",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "globonews",
+    "nome": "GloboNews",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": [
+      "globo news"
+    ]
+  },
+  {
+    "id": "cnn-brasil",
+    "nome": "CNN Brasil",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": [
+      "cnn"
+    ]
+  },
+  {
+    "id": "bandnews-tv",
+    "nome": "BandNews TV",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": [
+      "band news",
+      "bandnews"
+    ]
+  },
+  {
+    "id": "record-news",
+    "nome": "Record News",
+    "grupo": "Notícias",
+    "tipo": "aberta",
+    "apelidos": [
+      "recordnews"
+    ]
+  },
+  {
+    "id": "jovem-pan-news",
+    "nome": "Jovem Pan News",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": [
+      "jovem pan",
+      "jp news"
+    ]
+  },
+  {
+    "id": "sbt-news",
+    "nome": "SBT News",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "times-brasil",
+    "nome": "Times Brasil",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": [
+      "cnbc brasil",
+      "times brasil cnbc"
+    ]
+  },
+  {
+    "id": "cnn-international",
+    "nome": "CNN International",
+    "grupo": "Notícias",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "sportv",
+    "nome": "SporTV",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "sport tv"
+    ]
+  },
+  {
+    "id": "sportv-2",
+    "nome": "SporTV 2",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "sport tv 2"
+    ]
+  },
+  {
+    "id": "sportv-3",
+    "nome": "SporTV 3",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "sport tv 3"
+    ]
+  },
+  {
+    "id": "espn",
+    "nome": "ESPN",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "espn brasil",
+      "espn br",
+      "espn hd"
+    ]
+  },
+  {
+    "id": "espn-2",
+    "nome": "ESPN 2",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "espn-3",
+    "nome": "ESPN 3",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "espn-4",
+    "nome": "ESPN 4",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "espn-5",
+    "nome": "ESPN 5",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "espn-6",
+    "nome": "ESPN 6",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "premiere",
+    "nome": "Premiere",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "premiere fc",
+      "premiere clubes",
+      "pfc",
+      "premiere hd"
+    ]
+  },
+  {
+    "id": "combate",
+    "nome": "Combate",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "canal combate"
+    ]
+  },
+  {
+    "id": "bandsports",
+    "nome": "BandSports",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "band sports",
+      "band sport"
+    ]
+  },
+  {
+    "id": "tnt-sports",
+    "nome": "TNT Sports",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "esporte interativo",
+      "ei",
+      "ei maxx",
+      "ei max"
+    ]
+  },
+  {
+    "id": "fox-sports",
+    "nome": "Fox Sports",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "fox sports 2",
+      "fox sport"
+    ]
+  },
+  {
+    "id": "canal-off",
+    "nome": "Canal Off",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "off"
+    ]
+  },
+  {
+    "id": "xsports",
+    "nome": "Xsports",
+    "grupo": "Esportes",
+    "tipo": "fechada",
+    "apelidos": [
+      "x sports"
+    ]
+  },
+  {
+    "id": "a-e",
+    "nome": "A&E",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "a e",
+      "ae",
+      "a and e"
+    ]
+  },
+  {
+    "id": "axn",
+    "nome": "AXN",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "amc",
+    "nome": "AMC",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "cinemax",
+    "nome": "Cinemax",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo",
+    "nome": "HBO",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo-2",
+    "nome": "HBO 2",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo-plus",
+    "nome": "HBO Plus",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "hbo +"
+    ]
+  },
+  {
+    "id": "hbo-family",
+    "nome": "HBO Family",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo-signature",
+    "nome": "HBO Signature",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo-mundi",
+    "nome": "HBO Mundi",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo-pop",
+    "nome": "HBO Pop",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hbo-xtreme",
+    "nome": "HBO Xtreme",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "telecine-premium",
+    "nome": "Telecine Premium",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "telecine"
+    ]
+  },
+  {
+    "id": "telecine-action",
+    "nome": "Telecine Action",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "tc action"
+    ]
+  },
+  {
+    "id": "telecine-touch",
+    "nome": "Telecine Touch",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "tc touch"
+    ]
+  },
+  {
+    "id": "telecine-fun",
+    "nome": "Telecine Fun",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "tc fun"
+    ]
+  },
+  {
+    "id": "telecine-pipoca",
+    "nome": "Telecine Pipoca",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "tc pipoca"
+    ]
+  },
+  {
+    "id": "telecine-cult",
+    "nome": "Telecine Cult",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "tc cult"
+    ]
+  },
+  {
+    "id": "megapix",
+    "nome": "Megapix",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "mega pix"
+    ]
+  },
+  {
+    "id": "universal-tv",
+    "nome": "Universal TV",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "universal",
+      "universal channel"
+    ]
+  },
+  {
+    "id": "studio-universal",
+    "nome": "Studio Universal",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "syfy",
+    "nome": "SyFy",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "sy fy"
+    ]
+  },
+  {
+    "id": "warner-channel",
+    "nome": "Warner Channel",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "warner",
+      "warner tv"
+    ]
+  },
+  {
+    "id": "tnt",
+    "nome": "TNT",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "tnt-series",
+    "nome": "TNT Séries",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "tnt series"
+    ]
+  },
+  {
+    "id": "tnt-novelas",
+    "nome": "TNT Novelas",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "space",
+    "nome": "Space",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "canal space"
+    ]
+  },
+  {
+    "id": "sony-channel",
+    "nome": "Sony Channel",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "sony"
+    ]
+  },
+  {
+    "id": "canal-brasil",
+    "nome": "Canal Brasil",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "fx",
+    "nome": "FX",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "star-channel",
+    "nome": "Star Channel",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "star"
+    ]
+  },
+  {
+    "id": "paramount-network",
+    "nome": "Paramount Network",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "paramount",
+      "paramount channel"
+    ]
+  },
+  {
+    "id": "film-arts",
+    "nome": "Film&Arts",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "film arts",
+      "film e arts"
+    ]
+  },
+  {
+    "id": "prime-box-brazil",
+    "nome": "Prime Box Brazil",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "prime box"
+    ]
+  },
+  {
+    "id": "curta",
+    "nome": "Curta!",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "curta"
+    ]
+  },
+  {
+    "id": "cine-brasil-tv",
+    "nome": "Cine Brasil TV",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "cine brasil"
+    ]
+  },
+  {
+    "id": "fox",
+    "nome": "Fox",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "fox channel"
+    ]
+  },
+  {
+    "id": "fox-premium",
+    "nome": "Fox Premium",
+    "grupo": "Filmes e Séries",
+    "tipo": "fechada",
+    "apelidos": [
+      "fox premium 1",
+      "fox premium 2"
+    ]
+  },
+  {
+    "id": "cartoon-network",
+    "nome": "Cartoon Network",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "cartoon"
+    ]
+  },
+  {
+    "id": "cartoonito",
+    "nome": "Cartoonito",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "discovery-kids",
+    "nome": "Discovery Kids",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "disney-channel",
+    "nome": "Disney Channel",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "disney"
+    ]
+  },
+  {
+    "id": "disney-junior",
+    "nome": "Disney Junior",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "disney jr"
+    ]
+  },
+  {
+    "id": "disney-xd",
+    "nome": "Disney XD",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "nickelodeon",
+    "nome": "Nickelodeon",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "nick"
+    ]
+  },
+  {
+    "id": "nick-jr",
+    "nome": "Nick Jr.",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "nick jr",
+      "nick junior"
+    ]
+  },
+  {
+    "id": "gloob",
+    "nome": "Gloob",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "gloobinho",
+    "nome": "Gloobinho",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "tooncast",
+    "nome": "Tooncast",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "boomerang",
+    "nome": "Boomerang",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "tv-ra-tim-bum",
+    "nome": "TV Rá-Tim-Bum",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "tv ra tim bum",
+      "ra tim bum"
+    ]
+  },
+  {
+    "id": "baby-tv",
+    "nome": "Baby TV",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": [
+      "babytv"
+    ]
+  },
+  {
+    "id": "zoomoo",
+    "nome": "Zoomoo",
+    "grupo": "Infantil",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "discovery-channel",
+    "nome": "Discovery Channel",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "discovery"
+    ]
+  },
+  {
+    "id": "discovery-turbo",
+    "nome": "Discovery Turbo",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "discovery-science",
+    "nome": "Discovery Science",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "discovery-world",
+    "nome": "Discovery World",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "discovery-theater",
+    "nome": "Discovery Theater",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "discovery theater hd"
+    ]
+  },
+  {
+    "id": "animal-planet",
+    "nome": "Animal Planet",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "history",
+    "nome": "History",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "history channel",
+      "the history channel"
+    ]
+  },
+  {
+    "id": "history-2",
+    "nome": "History 2",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "h2"
+    ]
+  },
+  {
+    "id": "national-geographic",
+    "nome": "National Geographic",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "nat geo",
+      "natgeo",
+      "national geographic channel"
+    ]
+  },
+  {
+    "id": "nat-geo-wild",
+    "nome": "Nat Geo Wild",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "natgeo wild"
+    ]
+  },
+  {
+    "id": "investigacao-discovery",
+    "nome": "Investigação Discovery",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "investigation discovery",
+      "id",
+      "id discovery"
+    ]
+  },
+  {
+    "id": "smithsonian-channel",
+    "nome": "Smithsonian Channel",
+    "grupo": "Documentários",
+    "tipo": "fechada",
+    "apelidos": [
+      "smithsonian"
+    ]
+  },
+  {
+    "id": "gnt",
+    "nome": "GNT",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "multishow",
+    "nome": "Multishow",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": [
+      "multi show"
+    ]
+  },
+  {
+    "id": "viva",
+    "nome": "Viva",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": [
+      "canal viva"
+    ]
+  },
+  {
+    "id": "discovery-home-health",
+    "nome": "Discovery Home & Health",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": [
+      "discovery h h",
+      "home health",
+      "discovery home health",
+      "dhh"
+    ]
+  },
+  {
+    "id": "tlc",
+    "nome": "TLC",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "e",
+    "nome": "E!",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": [
+      "e entertainment",
+      "e entertainment television"
+    ]
+  },
+  {
+    "id": "food-network",
+    "nome": "Food Network",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "lifetime",
+    "nome": "Lifetime",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "comedy-central",
+    "nome": "Comedy Central",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "arte-1",
+    "nome": "Arte 1",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": [
+      "arte1"
+    ]
+  },
+  {
+    "id": "modo-viagem",
+    "nome": "Modo Viagem",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "travel-box-brazil",
+    "nome": "Travel Box Brazil",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": [
+      "travel box"
+    ]
+  },
+  {
+    "id": "woohoo",
+    "nome": "Woohoo",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "hgtv",
+    "nome": "HGTV",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "mais-na-tela",
+    "nome": "Mais na Tela",
+    "grupo": "Variedades",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "mtv",
+    "nome": "MTV",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": [
+      "mtv brasil",
+      "mtv hd"
+    ]
+  },
+  {
+    "id": "mtv-00s",
+    "nome": "MTV 00s",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": [
+      "mtv 00"
+    ]
+  },
+  {
+    "id": "mtv-live",
+    "nome": "MTV Live",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "bis",
+    "nome": "Bis",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": [
+      "canal bis"
+    ]
+  },
+  {
+    "id": "music-box-brazil",
+    "nome": "Music Box Brazil",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": [
+      "music box"
+    ]
+  },
+  {
+    "id": "trace-brazuca",
+    "nome": "Trace Brazuca",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": [
+      "trace"
+    ]
+  },
+  {
+    "id": "vh1",
+    "nome": "VH1",
+    "grupo": "Música",
+    "tipo": "fechada",
+    "apelidos": [
+      "vh1 mega hits"
+    ]
+  },
+  {
+    "id": "cancao-nova",
+    "nome": "Canção Nova",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "cancao nova",
+      "tv cancao nova"
+    ]
+  },
+  {
+    "id": "rede-vida",
+    "nome": "Rede Vida",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv rede vida"
+    ]
+  },
+  {
+    "id": "tv-aparecida",
+    "nome": "TV Aparecida",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "aparecida"
+    ]
+  },
+  {
+    "id": "rede-gospel",
+    "nome": "Rede Gospel",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "gospel"
+    ]
+  },
+  {
+    "id": "rit",
+    "nome": "RIT",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "rit tv",
+      "rede internacional de televisao"
+    ]
+  },
+  {
+    "id": "rede-seculo-21",
+    "nome": "Rede Século 21",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "rede seculo 21",
+      "seculo 21",
+      "tv seculo 21"
+    ]
+  },
+  {
+    "id": "tv-evangelizar",
+    "nome": "TV Evangelizar",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "evangelizar",
+      "tv evangeliza"
+    ]
+  },
+  {
+    "id": "boa-vontade-tv",
+    "nome": "Boa Vontade TV",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "boa vontade",
+      "tv boa vontade"
+    ]
+  },
+  {
+    "id": "tv-novo-tempo",
+    "nome": "TV Novo Tempo",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "novo tempo"
+    ]
+  },
+  {
+    "id": "tv-universal",
+    "nome": "TV Universal",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "iurd tv"
+    ]
+  },
+  {
+    "id": "rede-super",
+    "nome": "Rede Super",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "tv-pai-eterno",
+    "nome": "TV Pai Eterno",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "pai eterno"
+    ]
+  },
+  {
+    "id": "tv-nazare",
+    "nome": "TV Nazaré",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv nazare"
+    ]
+  },
+  {
+    "id": "rede-mundial",
+    "nome": "Rede Mundial",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv mundial"
+    ]
+  },
+  {
+    "id": "fonte-tv",
+    "nome": "Fonte TV",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "fonte"
+    ]
+  },
+  {
+    "id": "impd-tv",
+    "nome": "IMPD TV",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "impd"
+    ]
+  },
+  {
+    "id": "tv-terceiro-anjo",
+    "nome": "TV Terceiro Anjo",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "terceiro anjo"
+    ]
+  },
+  {
+    "id": "tv-horizonte",
+    "nome": "TV Horizonte",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "tv-imaculada",
+    "nome": "TV Imaculada",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "tv-alvorada-espirita",
+    "nome": "TV Alvorada Espírita",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv alvorada espirita"
+    ]
+  },
+  {
+    "id": "feb-tv",
+    "nome": "FEB TV",
+    "grupo": "Religiosos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "tv-camara",
+    "nome": "TV Câmara",
+    "grupo": "Públicos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv camara",
+      "camara"
+    ]
+  },
+  {
+    "id": "tv-senado",
+    "nome": "TV Senado",
+    "grupo": "Públicos",
+    "tipo": "aberta",
+    "apelidos": [
+      "senado"
+    ]
+  },
+  {
+    "id": "tv-justica",
+    "nome": "TV Justiça",
+    "grupo": "Públicos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv justica"
+    ]
+  },
+  {
+    "id": "canal-gov",
+    "nome": "Canal Gov",
+    "grupo": "Públicos",
+    "tipo": "aberta",
+    "apelidos": [
+      "nbr",
+      "tv nbr"
+    ]
+  },
+  {
+    "id": "tv-escola",
+    "nome": "TV Escola",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv escola hd"
+    ]
+  },
+  {
+    "id": "canal-futura",
+    "nome": "Canal Futura",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "futura",
+      "tv futura"
+    ]
+  },
+  {
+    "id": "rede-minas",
+    "nome": "Rede Minas",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "tve-rs",
+    "nome": "TVE RS",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tve rio grande do sul"
+    ]
+  },
+  {
+    "id": "tve-bahia",
+    "nome": "TVE Bahia",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tve ba"
+    ]
+  },
+  {
+    "id": "canal-saude",
+    "nome": "Canal Saúde",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "canal saude"
+    ]
+  },
+  {
+    "id": "tv-parana-turismo",
+    "nome": "TV Paraná Turismo",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "e parana",
+      "tv parana"
+    ]
+  },
+  {
+    "id": "tv-ufg",
+    "nome": "TV UFG",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "tv-aperipe",
+    "nome": "TV Aperipê",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv aperipe"
+    ]
+  },
+  {
+    "id": "tv-brasil-central",
+    "nome": "TV Brasil Central",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": []
+  },
+  {
+    "id": "univesp-tv",
+    "nome": "Univesp TV",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "univesp"
+    ]
+  },
+  {
+    "id": "tv-universitaria",
+    "nome": "TV Universitária",
+    "grupo": "Educativos",
+    "tipo": "aberta",
+    "apelidos": [
+      "tv universitaria",
+      "tvu"
+    ]
+  },
+  {
+    "id": "canal-rural",
+    "nome": "Canal Rural",
+    "grupo": "Agro",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "terraviva",
+    "nome": "Terraviva",
+    "grupo": "Agro",
+    "tipo": "fechada",
+    "apelidos": [
+      "terra viva"
+    ]
+  },
+  {
+    "id": "canal-do-boi",
+    "nome": "Canal do Boi",
+    "grupo": "Agro",
+    "tipo": "fechada",
+    "apelidos": []
+  },
+  {
+    "id": "agromais",
+    "nome": "AgroMais",
+    "grupo": "Agro",
+    "tipo": "fechada",
+    "apelidos": [
+      "agro mais"
+    ]
+  },
+  {
+    "id": "agro-canal",
+    "nome": "Agro Canal",
+    "grupo": "Agro",
+    "tipo": "fechada",
+    "apelidos": [
+      "agrocanal"
+    ]
+  },
+  {
+    "id": "agro-brasil-tv",
+    "nome": "Agro Brasil TV",
+    "grupo": "Agro",
+    "tipo": "fechada",
+    "apelidos": [
+      "agro brasil"
+    ]
+  },
+  {
+    "id": "shoptime",
+    "nome": "Shoptime",
+    "grupo": "Compras",
+    "tipo": "fechada",
+    "apelidos": [
+      "shop time"
+    ]
+  },
+  {
+    "id": "polishop-tv",
+    "nome": "Polishop TV",
+    "grupo": "Compras",
+    "tipo": "aberta",
+    "apelidos": [
+      "polishop"
+    ]
+  }
+]

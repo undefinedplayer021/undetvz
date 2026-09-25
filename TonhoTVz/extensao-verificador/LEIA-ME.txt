@@ -1,0 +1,16 @@
+VERIFICADOR DE CANAIS (extensao do Chrome/Edge para o Montador)
+
+Com a extensao, a bolinha verde quer dizer que o canal esta TRANSMITINDO:
+a lista responde, o video chega e, se for ao vivo, novos trechos estao entrando.
+Ela ignora as travas que o navegador tem e confere o canal como um app faria.
+
+INSTALAR (uma vez so)
+1. No Chrome, abra chrome://extensions  (no Edge: edge://extensions)
+2. Ligue o "Modo do desenvolvedor" (canto superior direito).
+3. Clique em "Carregar sem compactacao" e escolha esta pasta (extensao-verificador).
+4. Na extensao que apareceu, clique em "Detalhes" e ligue
+   "Permitir acesso a URLs de arquivo". SEM ISSO ELA NAO FUNCIONA.
+5. Abra (ou recarregue) o montador.html. A legenda de Canais por grupo
+   passa a dizer "Verificacao completa pela extensao".
+
+A extensao so conversa com arquivos locais que tenham "montador" no nome ou na pasta.

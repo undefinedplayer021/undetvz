@@ -1,0 +1,46 @@
+SERVIDOR DA TV DA FAMILIA (login no padrao Xtream Codes)
+
+O QUE TEM AQUI
+- montador.html       : o Montador (canais, grupos, usuarios). Abra no Chrome ou Edge.
+- dados/usuarios.json : quem pode entrar (usuario, senha, validade)
+- dados/canais.json   : os canais e grupos (gerado pelo Montador)
+- netlify/            : o codigo que responde ao IPTV Smarters
+- public/index.html   : pagina inicial do site, com as instrucoes de login
+- publicar.bat        : publica tudo no Netlify
+- extensao-verificador: extensao do Chrome que confere se os canais estao transmitindo
+                        (instrucoes no LEIA-ME de dentro dela)
+
+ATENCAO: esta pasta tem as senhas da familia. Nao publique em repositorio publico.
+As senhas NAO ficam visiveis no site: so o codigo do servidor le esses arquivos.
+
+PUBLICAR (Windows)
+1. Instale o Node.js (versao LTS) em https://nodejs.org, se ainda nao tiver.
+2. Dê dois cliques em publicar.bat.
+3. Na primeira vez: ele abre o navegador para entrar no Netlify e pergunta
+   se quer criar um site novo ou usar um existente. Depois disso, é automatico.
+   (Arrastar a pasta em app.netlify.com/drop NAO serve aqui: esse jeito
+   publica só a pagina, sem a parte que confere o login.)
+
+NO IPTV SMARTERS
+Escolha "Login with Xtream Codes API" e preencha:
+- Any Name : qualquer nome (ex.: TV da Familia)
+- Username : o usuario
+- Password : a senha
+- URL      : https://SEU-SITE.netlify.app   (sem porta)
+
+Outros apps: a lista M3U com login fica em
+https://SEU-SITE.netlify.app/get.php?username=USUARIO&password=SENHA&type=m3u_plus
+
+ATUALIZAR CANAIS OU USUARIOS
+1. Abra o montador.html (Chrome ou Edge).
+2. Na primeira vez, clique em "Abrir pasta do servidor" e escolha ESTA pasta.
+   O navegador pede permissao para editar arquivos: permita.
+3. Faca as mudancas. O Montador salva sozinho na pasta dados.
+4. Rode o publicar.bat para colocar no ar.
+Os usuarios continuam com o mesmo login.
+Para tirar o acesso de alguem: exclua ou desative o usuario e publique de novo.
+O montador.html nao vai para o site: so a pasta public e publicada.
+
+SE UM CANAL NAO ABRIR NO APP
+Em Configuracoes do IPTV Smarters, troque o formato de transmissao
+(Stream Format) para HLS / m3u8.

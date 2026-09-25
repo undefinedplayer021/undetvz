@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M3U Classificador • TMDB</title>
+<style>
+:root{--bg:#080d18;--card:#111a2d;--card2:#0c1424;--line:#26324b;--text:#edf3ff;--muted:#94a1bd;--blue:#6ea8fe;--green:#4fd17b;--red:#ff6868;--yellow:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 20% 0,#182746 0,#080d18 42%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}.wrap{max-width:1250px;margin:auto;padding:26px}.hero h1{margin:0;font-size:29px}.hero p{color:var(--muted);margin:6px 0 20px}.card{background:rgba(17,26,45,.96);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 15px 45px #0004}h3{margin-top:0}textarea{width:100%;height:260px;resize:vertical;background:#070c16;color:#dfe8ff;border:1px solid var(--line);border-radius:11px;padding:13px;font:12px ui-monospace,Consolas,monospace}.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}.btn{border:0;border-radius:9px;padding:10px 14px;background:#273450;color:white;cursor:pointer;font-weight:650}.btn:hover{filter:brightness(1.12)}.primary{background:var(--blue);color:#07101f}.green{background:var(--green);color:#07140b}.danger{background:#53252b}.btn:disabled{opacity:.45;cursor:not-allowed}input,select{background:#070c16;color:#fff;border:1px solid var(--line);border-radius:8px;padding:9px}input[type=password]{flex:1;min-width:330px}.hint{font-size:12px;color:var(--muted);line-height:1.5}.status{padding:10px 12px;border-radius:9px;background:var(--card2);margin-top:10px}.ok{color:var(--green)}.err{color:var(--red)}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.stat{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px}.stat b{display:block;font-size:21px}.stat span{font-size:12px;color:var(--muted)}.progress{height:8px;background:#070c16;border-radius:20px;overflow:hidden;margin:12px 0}.bar{height:100%;width:0;background:var(--blue);transition:.2s}.tablewrap{overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:10px}table{border-collapse:collapse;width:100%;min-width:950px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}th{position:sticky;top:0;background:#172139}td input{width:260px}.tag{background:#273450;border-radius:99px;padding:4px 8px;font-size:12px}.hidden{display:none}.review-filters{align-items:center}.review-filters input[type=search]{min-width:280px}.review-filters select{min-width:150px}.footer{color:var(--muted);font-size:11px;margin-top:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.wrap{padding:13px}.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}input[type=password]{min-width:220px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+<h1>🎬 M3U Classificador — Filmes & Séries</h1>
+<p>Processamento local + consulta direta ao TMDB. Esta versão corrige a autenticação e testa a conexão antes de processar.</p>
+</div>
+
+<div class="card">
+<h3>1. Credencial TMDB</h3>
+<div class="row">
+<select id="authType">
+<option value="bearer">API Read Access Token (Bearer) — recomendado</option>
+<option value="apikey">API Key v3</option>
+</select>
+<input id="credential" type="password" placeholder="Cole sua credencial do TMDB">
+<button class="btn" id="save">💾 Salvar</button>
+<button class="btn" id="test">🔌 Testar conexão</button>
+</div>
+<div id="authStatus" class="status">Ainda não testado.</div>
+    <p class="hint">Se a credencial começar com <code>eyJ...</code>, use <b>API Read Access Token (Bearer)</b>. O botão “Testar conexão” valida a autenticação diretamente no TMDB.</p>
+<p class="hint">
+O TMDB aceita o <b>API Read Access Token</b> no cabeçalho <code>Authorization: Bearer ...</code>.
+Também aceita a API Key v3 pelo parâmetro <code>api_key</code>. O token é salvo somente no armazenamento local deste navegador.
+</p>
+</div>
+
+<div class="card">
+<h3>2. Lista M3U</h3>
+<textarea id="input" placeholder="#EXTM3U
+#EXTINF:-1,Interestelar
+https://exemplo/interestelar.m3u8
+#EXTINF:-1,The Boys
+https://exemplo/theboys.m3u8"></textarea>
+<div class="row" style="margin-top:10px">
+<label class="btn">📂 Abrir arquivo<input id="file" type="file" accept=".m3u,.m3u8,.txt" hidden></label>
+<button class="btn" id="sample">Exemplo</button>
+<button class="btn primary" id="process">🔍 Iniciar análise TMDB</button>
+<button class="btn" id="pause" disabled>⏸️ Parar</button>
+<button class="btn green" id="resume" disabled>▶️ Continuar</button>
+<button class="btn danger" id="clear">Limpar</button>
+</div>
+</div>
+
+<div class="card hidden" id="results">
+<h3>3. Processamento</h3>
+<div class="grid">
+<div class="stat"><b id="total">0</b><span>Total</span></div>
+<div class="stat"><b id="movies">0</b><span>Filmes</span></div>
+<div class="stat"><b id="series">0</b><span>Séries</span></div>
+<div class="stat"><b id="found">0</b><span>Identificados</span></div>
+<div class="stat"><b id="miss">0</b><span>Não encontrados</span></div>
+</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div id="progressText" class="status">Aguardando... O motor usa fuzzy matching + busca Movie/TV + metadados da M3U. A análise pode ser pausada e continuada sem perder os resultados já processados.</div>
+<div class="row" style="margin-top:11px">
+<button class="btn green" id="all">⬇️ M3U organizado</button>
+<button class="btn" id="moviesBtn">🎬 Filmes</button>
+<button class="btn" id="seriesBtn">📺 Séries</button>
+<button class="btn" id="csvBtn">📊 CSV</button>
+<button class="btn green" id="exportMovies">📤 Exportar Filmes — Gênero | Nome | Link</button>
+<button class="btn green" id="exportSeries">📤 Exportar Séries — Gênero | Nome | Link</button>
+</div>
+</div>
+
+<div class="card hidden" id="review">
+<h3>4. Revisão</h3>
+<p class="hint">Filtre por conteúdo, tipo e categoria. Os resultados permanecem em <b>ordem alfabética pelo nome</b>. O nome original mantém <code>[...]</code>, mas esses trechos nunca são enviados na pesquisa do TMDB.</p>
+<div class="row review-filters" style="margin:10px 0 12px">
+  <input id="reviewSearch" type="search" placeholder="🔎 Filtrar por nome, correspondência, grupo ou tvg-name..." style="flex:1;min-width:280px">
+  <select id="reviewType" title="Filtrar por tipo">
+    <option value="">Todos os tipos</option>
+    <option value="Filme">Filmes</option>
+    <option value="Série">Séries</option>
+  </select>
+  <select id="reviewGenre" title="Filtrar por categoria">
+    <option value="">Todas as categorias</option>
+  </select>
+  <button class="btn" id="reviewClear">Limpar filtros</button>
+</div>
+<div id="reviewCount" class="hint" style="margin-bottom:8px">0 itens</div>
+<div class="tablewrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th>Categoria</th><th>Confiança</th><th>Correspondência TMDB</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div>
+</div>
+</div>
+
+<div class="footer">Categorias: Ação, Aventura, Comédia, Drama, Terror, Suspense, Romance, Ficção Científica, Fantasia, Animação, Documentário, Biografia, Kids e Não identificado.</div>
+</div>
+
+<script>
+const CATS=["Ação","Aventura","Comédia","Drama","Terror","Suspense","Romance","Ficção Científica","Fantasia","Animação","Documentário","Biografia","Kids","Não identificado"];
+const GENRE={28:"Ação",12:"Aventura",35:"Comédia",18:"Drama",27:"Terror",53:"Suspense",10749:"Romance",878:"Ficção Científica",14:"Fantasia",16:"Animação",99:"Documentário",36:"Biografia",10751:"Kids",10762:"Kids",10759:"Ação",10765:"Ficção Científica"};
+const CACHE_KEY="m3u_tmdb_cache_v9";
+localStorage.removeItem("m3u_tmdb_cache_v8");
+localStorage.removeItem("m3u_tmdb_cache_v7");
+localStorage.removeItem("m3u_tmdb_cache_v6");
+let items=[], cache=JSON.parse(localStorage.getItem(CACHE_KEY)||"{}");
+let analysisState={running:false,paused:false,index:0};
+
+const $=x=>document.getElementById(x);
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+function save(){localStorage.setItem("tmdb_auth_type",$("authType").value);localStorage.setItem("tmdb_credential",$("credential").value.trim());}
+function load(){
+ $("authType").value=localStorage.getItem("tmdb_auth_type")||"bearer";
+ $("credential").value=localStorage.getItem("tmdb_credential")||"";
+ autoDetectCredential();
+}
+function autoDetectCredential(){
+ const v=$("credential").value.trim();
+ if(v.startsWith("eyJ") && v.split(".").length===3){
+   $("authType").value="bearer";
+ }
+}
+$("credential").addEventListener("input",autoDetectCredential);
+load();
+
+$("save").onclick=()=>{save();$("authStatus").innerHTML='<span class="ok">Credencial salva localmente.</span>'};
+$("authType").onchange=()=>{load();$("authStatus").textContent="Tipo de autenticação alterado. Teste a conexão.";};
+
+function requestUrl(path){
+ let u="https://api.themoviedb.org/3"+path;
+ if($("authType").value==="apikey"){
+   const sep=u.includes("?")?"&":"?";
+   u+=sep+"api_key="+encodeURIComponent($("credential").value.trim());
+ }
+ return u;
+}
+async function api(path){
+ const cred=$("credential").value.trim();
+ if(!cred)throw new Error("A credencial está vazia.");
+
+ let url="https://api.themoviedb.org/3"+path;
+ const headers={accept:"application/json"};
+
+ if($("authType").value==="bearer"){
+   headers.Authorization="Bearer "+cred;
+ }else{
+   const sep=url.includes("?")?"&":"?";
+   url+=sep+"api_key="+encodeURIComponent(cred);
+ }
+
+ for(let attempt=0;attempt<5;attempt++){
+   let r;
+   try{
+     r=await fetch(url,{method:"GET",headers,mode:"cors",cache:"no-store"});
+   }catch(e){
+     throw new Error("Falha de rede/CORS ao acessar o TMDB. Se o arquivo estiver aberto como file://, tente abrir pelo navegador via http://localhost.");
+   }
+
+   if(r.status===429){
+     // Processamento em paralelo pode esbarrar no limite de taxa do TMDB
+     // de vez em quando — espera e tenta de novo em vez de abortar a análise.
+     const retryAfter=Number(r.headers.get("retry-after"));
+     await new Promise(res=>setTimeout(res,(retryAfter>0?retryAfter*1000:900)));
+     continue;
+   }
+
+   const txt=await r.text();
+   let data={};try{data=JSON.parse(txt)}catch{}
+   if(!r.ok)throw new Error(`HTTP ${r.status}${data.status_message?": "+data.status_message:""}${data.status_code?" (TMDB "+data.status_code+")":""}`);
+   return data;
+ }
+ throw new Error("O TMDB continua limitando as requisições (429) após várias tentativas.");
+}
+
+async function testConnection(){
+ save();$("test").disabled=true;$("authStatus").textContent="Testando...";
+ try{
+   const d=await api("/authentication");
+   if(!d)throw new Error("Resposta inesperada do TMDB.");
+   $("authStatus").innerHTML='<span class="ok">✓ TMDB conectado com sucesso.</span>';
+ }catch(e){
+   $("authStatus").innerHTML='<span class="err">✕ '+esc(e.message)+"</span>";
+ }finally{$("test").disabled=false}
+}
+$("test").onclick=testConnection;
+
+$("file").onchange=e=>{const f=e.target.files[0];if(f)f.text().then(t=>$("input").value=t)};
+$("sample").onclick=()=>{$("input").value="#EXTM3U\n#EXTINF:-1,Interestelar\nhttps://exemplo/interestelar.m3u8\n#EXTINF:-1,The Boys\nhttps://exemplo/theboys.m3u8\n#EXTINF:-1,Invocação do Mal\nhttps://exemplo/invocacao.m3u8"};
+$("clear").onclick=()=>{
+ items=[];
+ analysisState={running:false,paused:false,index:0};
+ $("input").value="";
+ $("results").classList.add("hidden");
+ $("review").classList.add("hidden");
+ $("bar").style.width="0";
+ $("pause").disabled=true;
+ $("resume").disabled=true;
+ $("process").disabled=false;
+};
+
+const NOISE_WORDS=new Set([
+ "24h","4k","8k","2k","fhd","uhd","hd","sd","hq","lq","fullhd",
+ "1080p","720p","576p","480p","2160p",
+ "dublado","dub","dublagem","redublagem","legendado","legendas","leg",
+ "dual","audio","multi","nacional","original",
+ "remux","bluray","brrip","webdl","webrip","hdtv","hdr","dolby","atmos",
+ "x264","x265","hevc","aac","ac3","10bit","8bit",
+ "cam","hdcam","hdts","hdtc","dvdscr","scr","r5","dvdrip",
+ "filme","filmes","movie","movies","serie","series","tv",
+ "temporada","temporadas","season","seasons","temp",
+ "episodio","episodios","episode","episodes","ep","eps",
+ "capitulo",
+ "completa","completo","estendida","estendido",
+ "remasterizado","remastered","uncut","unrated","ptbr"
+]);
+// Nota: como norm() já remove acentos antes da tokenização, formas
+// acentuadas ("série", "capítulo"...) nunca colidem com um token — por
+// isso não são listadas aqui; as formas sem acento acima já cobrem os dois casos.
+
+const GENERIC_CHANNELS=new Set([
+ "netflix","hbo","hbo max","max","hbo family","hbo signature","hbo plus","hbo2",
+ "disney","disney plus","prime video","amazon","amazon prime",
+ "globoplay","paramount","paramount plus","apple tv","star","star plus","starz",
+ "telecine","telecine premium","telecine touch","telecine fun","telecine pipoca",
+ "telecine cult","telecine action","tnt","tnt series","warner","warner channel",
+ "universal","universal tv","studio universal","sony","sony channel","fx","axn",
+ "record","record news","record tv","globo","sbt","sbt news","band","band news",
+ "band sports","megapix","space","cinemax","tcm","cartoon network","cartoonito",
+ "discovery","discovery kids","discovery channel","history","history channel",
+ "nat geo","natgeo","national geographic","comedy central","mtv","viva",
+ "multishow","gnt","canal brasil","curta","arte1","cnn brasil","combate",
+ "premiere","premiere clubes","sportv","espn","espn brasil","fox sports",
+ "jovem pan news"
+]);
+
+function parseAttrs(line){
+ const attrs={};
+ const re=/([\w-]+)="([^"]*)"/g;
+ let m;
+ while((m=re.exec(line)))attrs[m[1].toLowerCase()]=m[2];
+ return attrs;
+}
+
+function clean(s){
+ return String(s??"")
+   .replace(/\[24H\]/gi," ")
+   .replace(/\s+/g," ").trim();
+}
+
+function norm(s){
+ return String(s??"")
+   .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+   .toLowerCase()
+   .replace(/\[[^\]]*\]/g," ")
+   .replace(/https?:\/\/\S+/g," ")
+   // Remove "temporada 1", "episodio 5", "capitulo 12" etc. as phrases
+   // (word+number together) before the bare-word noise filter below,
+   // so the loose digits don't survive as an extra unmatched token.
+   .replace(/\b(?:temporadas?|seasons?|temp)\s*\d{1,3}\b/gi," ")
+   .replace(/\b(?:episodios?|episodes?|ep|capitulos?|chapters?)\.?\s*\d{1,3}\b/gi," ")
+   .replace(/\b(?:s\d{1,2}\s*e\d{1,3}|e\d{1,3}|s\d{1,2}|ep\.?\s*\d{1,3})\b/gi," ")
+   // Alternate season/episode notation used a lot in PT/ES sources: "1x01".
+   .replace(/\b\d{1,2}x\d{1,3}\b/gi," ")
+   .replace(/\b(?:\d{3,4}p|4k|8k|uhd|fhd|hd|sd|hdr|dolby|atmos)\b/gi," ")
+   .replace(/[._|]+/g," ")
+   .replace(/[-–—]+/g," ")
+   // Punctuation (colon included) is dropped rather than kept: an IPTV
+   // name that omits a colon the official title has (or vice versa)
+   // would otherwise leave a token like "vingadores:" that never matches
+   // "vingadores" on the other side.
+   .replace(/[^\p{L}\p{N}\s]/gu," ")
+   .replace(/\s+/g," ").trim();
+}
+
+function tmdbQuery(s){
+ return compact(String(s??"")
+   .replace(/\[[^\]]*\]/g," ")
+   .replace(/\[24H\]/gi," "))
+   .replace(/\s+/g," ").trim();
+}
+
+function tokens(s){
+ // A lone digit can be the whole point of a title ("Round 6", "9", "Se7en"
+ // style numbering in Asian titles is common) — only single *letters*
+ // (leftovers from punctuation splits, like a stray "e" or "s") are
+ // dropped for being too short to carry meaning on their own.
+ return norm(s).split(/\s+/).filter(t=>(t.length>1||/^\d$/.test(t)) && !NOISE_WORDS.has(t));
+}
+
+function compact(s){return tokens(s).join(" ");}
+
+function levenshtein(a,b){
+ if(a===b)return 0;
+ if(!a)return b.length;
+ if(!b)return a.length;
+ const prev=new Array(b.length+1);
+ for(let j=0;j<=b.length;j++)prev[j]=j;
+ for(let i=1;i<=a.length;i++){
+   let cur=[i];
+   for(let j=1;j<=b.length;j++){
+     cur[j]=Math.min(
+       cur[j-1]+1,
+       prev[j]+1,
+       prev[j-1]+(a[i-1]===b[j-1]?0:1)
+     );
+   }
+   for(let j=0;j<=b.length;j++)prev[j]=cur[j];
+ }
+ return prev[b.length];
+}
+
+function editSim(a,b){
+ a=compact(a);b=compact(b);
+ if(!a||!b)return 0;
+ return Math.max(0,1-levenshtein(a,b)/Math.max(a.length,b.length));
+}
+
+function tokenScore(a,b){
+ const A=new Set(tokens(a)),B=new Set(tokens(b));
+ if(!A.size||!B.size)return 0;
+ let common=0;
+ for(const x of A)if(B.has(x))common++;
+ const precision=common/A.size;
+ const recall=common/B.size;
+ const jaccard=common/(A.size+B.size-common);
+ return Math.max(jaccard, (precision*0.65+recall*0.35));
+}
+
+function containmentScore(a,b){
+ const x=compact(a),y=compact(b);
+ if(!x||!y)return 0;
+ if(x===y)return 1;
+ if(y.includes(x)||x.includes(y))return Math.min(x.length,y.length)/Math.max(x.length,y.length);
+ return 0;
+}
+
+function yearFrom(s){
+ const m=String(s||"").match(/\b(19\d{2}|20\d{2})\b/);
+ return m?Number(m[1]):null;
+}
+
+function removeYear(s){return String(s||"").replace(/\b(19\d{2}|20\d{2})\b/g," ");}
+
+// Strips a specific year token out of an already-compacted query string,
+// but only when doing so leaves something behind — a title that IS a
+// year ("1917", "2012") must never be emptied out by this.
+function stripYearToken(s,year){
+ if(!year)return s;
+ const stripped=String(s||"").replace(new RegExp("\\b"+year+"\\b","g")," ").replace(/\s+/g," ").trim();
+ return stripped.length>=2?stripped:s;
+}
+
+function isSeriesHint(it){
+ const s=(it.name+" "+it.tvgName+" "+it.group+" "+it.url).toLowerCase();
+ return /\b(s\d{1,2}\s*e\d{1,3}|s\d{1,2}|e\d{1,3}|\d{1,2}x\d{1,3}|season|temporada|episode|episodio|serie|series|tv show|novela|anime)\b/i.test(s)
+   || /\b(tv|series|serie|shows)\b/i.test(it.group||"");
+}
+
+// A strict "S01E05" / "1x01" style marker is much stronger evidence than
+// the loose isSeriesHint() check above (which also fires on a bare word
+// like "series" in a group name) — used to override media-type scoring.
+function hasExplicitEpisodeMarker(it){
+ const s=(it.name+" "+it.tvgName+" "+it.group+" "+it.url).toLowerCase();
+ return /\b(s\d{1,2}\s*e\d{1,3}|\d{1,2}x\d{1,3})\b/i.test(s);
+}
+
+function isMovieHint(it){
+ const s=(it.name+" "+it.tvgName+" "+it.group+" "+it.url).toLowerCase();
+ return /\b(filme|filmes|movie|movies|cinema)\b/i.test(s)
+   || /\b(19\d{2}|20\d{2})\b/.test(s);
+}
+
+function extractUrlTitle(url){
+ try{
+   const u=new URL(url);
+   const last=decodeURIComponent(u.pathname.split("/").filter(Boolean).pop()||"");
+   return clean(last.replace(/\.(m3u8?|mp4|mkv|ts)$/i,"").replace(/[-_]+/g," "));
+ }catch{return "";}
+}
+
+function titleVariants(it){
+ const raw=[it.name,it.tvgName,it.group,extractUrlTitle(it.url)].filter(Boolean);
+ const variants=[];
+ const add=s=>{
+   s=clean(s);
+   if(!s)return;
+   const c=compact(s);
+   if(c && !variants.some(v=>compact(v)===c))variants.push(s);
+ };
+ raw.forEach(add);
+
+ // IPTV names frequently look like "NETFLIX | The Boys S01E01 | 1080P".
+ for(const s of raw){
+   for(const part of s.split(/\s*(?:\||•|»|>|::|→)\s*/)){
+     if(part.trim())add(part);
+   }
+   for(const part of s.split(/\s+-\s+/)){
+     if(part.trim())add(part);
+   }
+ }
+
+ // Prefer meaningful pieces over provider-only names.
+ const useful=variants.filter(v=>{
+   const c=compact(v);
+   return c.length>=3 && !GENERIC_CHANNELS.has(c);
+ });
+ return useful.length?useful:variants;
+}
+
+function guessType(it){
+ const s=(it.name+" "+it.tvgName+" "+it.group+" "+it.url).toLowerCase();
+ if(/\b(s\d{1,2}\s*e\d{1,3}|\d{1,2}x\d{1,3}|season\s*\d+|temporada\s*\d+|episodio|episode|novela|anime)\b/i.test(s))return "Série";
+ if(/\b(series|serie|tv\s*show|séries)\b/i.test(s))return "Série";
+ if(/\b(filme|filmes|movie|movies|cinema)\b/i.test(s))return "Filme";
+ return "Desconhecido";
+}
+
+function parseM3U(txt){
+ const lines=txt.split(/\r?\n/),out=[];
+ for(let i=0;i<lines.length;i++){
+   const line=lines[i].trim();
+   if(!line.startsWith("#EXTINF"))continue;
+   const attrs=parseAttrs(line);
+   const comma=line.indexOf(",");
+   const display=comma>=0?clean(line.slice(comma+1)):clean(line.replace(/^#EXTINF[^,]*/,""));
+   let url="";
+   for(let j=i+1;j<lines.length;j++){
+     const x=lines[j].trim();
+     if(!x||x.startsWith("#"))continue;
+     url=x;break;
+   }
+   if(display){
+     const tvgName=clean(attrs["tvg-name"]||"");
+     const group=clean(attrs["group-title"]||attrs["group"]||"");
+     const typeHint=guessType({name:display,tvgName,group,url});
+     out.push({
+       name:display,
+       tvgName,
+       group,
+       tvgId:attrs["tvg-id"]||"",
+       url,
+       type:"Não Identificado",
+       typeHint,
+       genre:"Não identificado",
+       confidence:0,
+       matched:"",
+       tmdbId:null,
+       matchedMediaType:"",
+       reason:"",
+       queryUsed:""
+     });
+   }
+ }
+ return out;
+}
+
+function chooseGenre(ids){
+ for(const id of ids||[])if(GENRE[id])return GENRE[id];
+ return "Não identificado";
+}
+
+function resultTitle(r){
+ return r?.title||r?.name||r?.original_title||r?.original_name||"";
+}
+
+function candidateScore(it,r,variant){
+ const title=resultTitle(r);
+ if(!title)return 0;
+ const qFull=tmdbQuery(variant);
+ const t=tmdbQuery(title);
+ if(!qFull||!t)return 0;
+
+ // A release year riding along in the query text ("Interestelar 2014")
+ // otherwise counts as an extra unmatched token/character against titles
+ // that never spell out a year, silently capping an obviously-correct
+ // match's score. Strip it before comparing text, and use it purely as a
+ // separate signal below. Titles that ARE just a year ("1917") are left
+ // untouched by stripYearToken's own safety check.
+ const qYear=yearFrom(variant);
+ const q=qYear?stripYearToken(qFull,qYear):qFull;
+
+ const edit=editSim(q,t);
+ const tok=tokenScore(q,t);
+ const contain=containmentScore(q,t);
+
+ let score=100*(0.48*edit+0.37*tok+0.15*contain);
+
+ if(q===t)score=100;
+
+ const rYear=yearFrom(r.release_date||r.first_air_date||"");
+ if(qYear&&rYear)score += qYear===rYear ? 6 : -6;
+
+ if(hasExplicitEpisodeMarker(it)){
+   // "S01E05" / "1x01" in the source name is near-certain proof it's an
+   // episode, so a movie candidate is penalized far harder than the
+   // softer general hint below.
+   score += r.media_type==="tv"?14:-20;
+ }else{
+   const seriesHint=isSeriesHint(it);
+   const movieHint=isMovieHint(it);
+   if(seriesHint)score += r.media_type==="tv"?9:-7;
+   if(movieHint)score += r.media_type==="movie"?7:-5;
+ }
+
+ // Popularity only breaks close ties; it never dominates title similarity.
+ score += Math.min(3,Math.log10((r.popularity||0)+1));
+
+ // Intentionally NOT capped at 100 here: two candidates can both be an
+ // exact text match (e.g. a movie and a series both literally named
+ // "The Boys") and still need the year/type-hint signals above to break
+ // the tie when collectCandidates() picks the best one. The confidence
+ // shown to the user is clamped to 100 later, in searchItem().
+ return Math.max(0,score);
+}
+
+function makeQueryVariants(it){
+ const vs=titleVariants(it);
+ const out=[];
+ for(const v of vs){
+   const q=tmdbQuery(v);
+   if(q.length<3)continue;
+   if(!out.some(x=>x===q))out.push(q);
+ }
+
+ // Long titles sometimes carry a trailing subtitle or a stray tag that
+ // survived the delimiter split. Add a shortened "core" version — the
+ // first 4 significant words — as one extra candidate; this only adds
+ // an option to try, it never replaces the full-title variant.
+ if(out[0]){
+   const words=out[0].split(" ");
+   if(words.length>4){
+     const core=words.slice(0,4).join(" ");
+     if(!out.some(x=>x===core))out.push(core);
+   }
+ }
+
+ // Every returned value is already TMDB-safe: no [ ... ] reaches the API.
+ return out.slice(0,6);
+}
+
+async function tmdbSearch(path){
+ const d=await api(path+"&language=pt-BR&include_adult=false&page=1");
+ return Array.isArray(d.results)?d.results:[];
+}
+
+async function collectCandidates(it){
+ const variants=makeQueryVariants(it);
+ const map=new Map();
+ const bestScore=()=>map.size?Math.max(...[...map.values()].map(x=>x.score)):0;
+
+ // Pass 1 — broad search: TMDB itself recommends /search/multi when
+ // movie/TV type is not known. Tries up to 4 title variants now instead
+ // of 3, so a noisy first variant doesn't waste the whole pass.
+ for(const q of variants.slice(0,4)){
+   const rs=await tmdbSearch("/search/multi?query="+encodeURIComponent(q));
+   for(const r of rs){
+     if(r.media_type!=="movie" && r.media_type!=="tv")continue;
+     const key=r.media_type+":"+r.id;
+     const sc=candidateScore(it,r,q);
+     const old=map.get(key);
+     if(!old || sc>old.score)map.set(key,{r,score:sc,query:q});
+   }
+   if(bestScore()>=94)break;
+ }
+
+ // Pass 2 — if the broad search came back weak or empty, escalate: query
+ // the dedicated /search/movie and /search/tv endpoints, walking through
+ // more variants (tvg-name, group, url-derived title, shortened core...)
+ // until a solid match appears. Every result is merged into the same
+ // map and only kept if it scores better than what's already there, so
+ // this pass can only add candidates, never lose a good one found in
+ // pass 1.
+ if(bestScore()<72){
+   for(const q of variants.slice(0,3)){
+     const [movies,tvs]=await Promise.all([
+       tmdbSearch("/search/movie?query="+encodeURIComponent(q)),
+       tmdbSearch("/search/tv?query="+encodeURIComponent(q))
+     ]);
+     for(const r of movies){
+       const sc=candidateScore(it,{...r,media_type:"movie"},q);
+       const key="movie:"+r.id,old=map.get(key);
+       if(!old||sc>old.score)map.set(key,{r:{...r,media_type:"movie"},score:sc,query:q});
+     }
+     for(const r of tvs){
+       const sc=candidateScore(it,{...r,media_type:"tv"},q);
+       const key="tv:"+r.id,old=map.get(key);
+       if(!old||sc>old.score)map.set(key,{r:{...r,media_type:"tv"},score:sc,query:q});
+     }
+     if(bestScore()>=80)break;
+   }
+ }
+
+ return [...map.values()].sort((a,b)=>b.score-a.score);
+}
+
+async function searchItem(it){
+ const key=tmdbQuery(it.name)+"|"+it.typeHint+"|"+tmdbQuery(it.tvgName)+"|"+tmdbQuery(it.group);
+ if(cache[key]){
+   const cached=cache[key];
+   // Preserve the TMDB classification. If a cached record lacks type,
+   // recover it from matchedMediaType instead of resetting it.
+   const cachedType =
+     cached.type==="Filme" || cached.type==="Série"
+       ? cached.type
+       : cached.matchedMediaType==="movie"
+         ? "Filme"
+         : cached.matchedMediaType==="tv"
+           ? "Série"
+           : "Não Identificado";
+
+   return {
+     ...it,
+     ...cached,
+     type:cachedType,
+     name:it.name,
+     url:it.url,
+     tvgName:it.tvgName,
+     group:it.group
+   };
+ }
+
+ const candidates=await collectCandidates(it);
+ const best=candidates[0];
+
+ if(!best){
+   const triedQuery=makeQueryVariants(it)[0]||it.name;
+   const z={
+     genre:"Não identificado",confidence:0,matched:"",tmdbId:null,
+     matchedMediaType:"",reason:`Nenhuma correspondência no TMDB (consulta enviada: "${triedQuery}").`,
+     queryUsed:triedQuery
+   };
+   cache[key]=z;localStorage.setItem(CACHE_KEY,JSON.stringify(cache));
+   return {...it,...z};
+ }
+
+ const r=best.r;
+ let type=r.media_type==="tv"?"Série":"Filme";
+ let confidence=Math.round(best.score);
+
+ // A decisive winner — a clear gap over the next-best candidate, or the
+ // only plausible candidate at all — is strong evidence of a correct
+ // match even when raw text similarity is only moderate (e.g. a dubbed
+ // or translated title). A close call between two similar candidates
+ // gets no such boost, since that's genuine ambiguity.
+ const second=candidates[1];
+ if(second){
+   const margin=best.score-second.score;
+   if(margin>=30)confidence=Math.min(100,confidence+4);
+   else if(margin>=15)confidence=Math.min(100,confidence+2);
+ }else{
+   confidence=Math.min(100,confidence+2);
+ }
+
+ // A very strong explicit season/episode hint wins over a near-tie.
+ if(isSeriesHint(it) && r.media_type==="tv")confidence=Math.min(100,confidence+3);
+ if(isMovieHint(it) && r.media_type==="movie")confidence=Math.min(100,confidence+3);
+
+ // Do not force weak/random matches into the catalogue.
+ const identified=confidence>=52;
+ const z={
+   genre:identified?chooseGenre(r.genre_ids):"Não identificado",
+   confidence:identified?confidence:0,
+   matched:identified?resultTitle(r):"",
+   tmdbId:identified?r.id:null,
+   matchedMediaType:identified?r.media_type:"",
+   type:identified?type:"Não Identificado",
+   reason:identified
+     ? `Fuzzy ${confidence}% • ${r.media_type==="tv"?"TV":"Movie"} • consulta: ${best.query}`
+     : `Correspondência fraca (${confidence}%) — melhor candidato: "${resultTitle(r)}" (consulta: "${best.query}").`,
+   queryUsed:best.query||it.name
+ };
+
+ cache[key]=z;
+ localStorage.setItem(CACHE_KEY,JSON.stringify(cache));
+ return {...it,...z,name:it.name,url:it.url,tvgName:it.tvgName,group:it.group};
+}
+
+function stats(){
+ $("total").textContent=items.length;
+ $("movies").textContent=items.filter(x=>x.type==="Filme").length;
+ $("series").textContent=items.filter(x=>x.type==="Série").length;
+ $("found").textContent=items.filter(x=>x.tmdbId).length;
+ $("miss").textContent=items.filter(x=>!x.tmdbId).length;
+}
+function populateReviewGenres(){
+ const sel=$("reviewGenre");
+ if(!sel)return;
+ const current=sel.value;
+ const genres=[...new Set(items.map(x=>x.genre).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR",{sensitivity:"base"}));
+ sel.innerHTML='<option value="">Todas as categorias</option>'+
+   genres.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+ if(genres.includes(current))sel.value=current;
+}
+
+function reviewMatches(x){
+ const q=norm($("reviewSearch")?.value||"");
+ const type=$("reviewType")?.value||"";
+ const genre=$("reviewGenre")?.value||"";
+ if(type && x.type!==type)return false;
+ if(genre && x.genre!==genre)return false;
+ if(!q)return true;
+
+ const hay=compact([
+   x.name,x.matched,x.tvgName,x.group,x.url,x.genre,x.type
+ ].filter(Boolean).join(" "));
+ return hay.includes(q);
+}
+
+function render(){
+ const tb=$("tbody");tb.innerHTML="";
+ populateReviewGenres();
+
+ const visible=items
+   .map((x,i)=>({x,i}))
+   .filter(({x})=>reviewMatches(x))
+   .sort((a,b)=>String(a.x.name||"").localeCompare(String(b.x.name||""),"pt-BR",{sensitivity:"base",numeric:true}));
+
+ $("reviewCount").textContent=`${visible.length} de ${items.length} item${items.length===1?"":"s"}`;
+
+ visible.forEach(({x,i})=>{
+  const tr=document.createElement("tr");
+  const source=[x.tvgName,x.group].filter(Boolean).join(" • ");
+  tr.innerHTML=`<td><input data-i="${i}" data-f="name" value="${esc(x.name)}"><div class="hint">${esc(source||x.url||"")}</div></td>
+  <td><select data-i="${i}" data-f="type">
+    <option value="Não Identificado" ${x.type!=="Filme"&&x.type!=="Série"?"selected":""}>Não Identificado</option>
+    <option value="Filme" ${x.type==="Filme"?"selected":""}>Filme</option>
+    <option value="Série" ${x.type==="Série"?"selected":""}>Série</option>
+  </select></td>
+  <td><select data-i="${i}" data-f="genre">${CATS.map(g=>`<option ${x.genre===g?"selected":""}>${g}</option>`).join("")}</select></td>
+  <td>${x.confidence?x.confidence+"%":"—"}</td>
+  <td><b>${esc(x.matched||"—")}</b><div class="hint">${esc(x.reason||"")}</div></td>
+  <td><div class="row" style="gap:6px">
+     <button class="btn" data-reset="${i}" title="Desfazer alterações">↩</button>
+     <button class="btn danger" data-delete="${i}" title="Excluir este item" aria-label="Excluir ${esc(x.name)}">✕</button>
+   </div></td>`;
+  tb.appendChild(tr);
+ });
+
+ tb.querySelectorAll("[data-f]").forEach(el=>el.onchange=()=>{
+  const i=+el.dataset.i,f=el.dataset.f;
+  items[i][f]=el.value;
+  if(f==="genre"){
+    items[i].manual=true;
+    const key=compact(items[i].name)+"|"+items[i].typeHint+"|"+compact(items[i].tvgName)+"|"+compact(items[i].group);
+    cache[key]={...(cache[key]||{}),genre:el.value,confidence:100};
+    localStorage.setItem(CACHE_KEY,JSON.stringify(cache));
+  }
+  if(f==="type"){
+    items[i].manual=true;
+    items[i].typeHint=el.value;
+  }
+  stats();
+  render();
+ });
+
+ tb.querySelectorAll("[data-reset]").forEach(b=>b.onclick=()=>{
+   items[+b.dataset.reset].genre="Não identificado";
+   items[+b.dataset.reset].confidence=0;
+   render();stats();
+ });
+
+  tb.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.delete;
+    if(i<0 || i>=items.length)return;
+    items.splice(i,1);
+    render();
+    stats();
+  });
+}
+function initReviewFilters(){
+ ["reviewSearch","reviewType","reviewGenre"].forEach(id=>{
+   const el=$(id);
+   if(!el)return;
+   el.addEventListener("input",render);
+   el.addEventListener("change",render);
+ });
+ $("reviewClear")?.addEventListener("click",()=>{
+   $("reviewSearch").value="";
+   $("reviewType").value="";
+   $("reviewGenre").value="";
+   render();
+ });
+}
+initReviewFilters();
+
+async function process(startIndex=0){
+ if(!$("credential").value.trim()){alert("Informe sua credencial TMDB primeiro.");return}
+ if(!items.length)items=parseM3U($("input").value);
+ if(!items.length){alert("Nenhuma entrada #EXTINF foi encontrada.");return}
+
+ $("results").classList.remove("hidden");
+ $("review").classList.remove("hidden");
+ stats();
+ $("bar").style.width=(startIndex/items.length*100)+"%";
+ $("process").disabled=true;
+ $("pause").disabled=false;
+ $("resume").disabled=true;
+ analysisState.running=true;
+ analysisState.paused=false;
+ analysisState.index=startIndex;
+
+ try{
+   // Validate authentication only when starting a fresh analysis.
+   if(startIndex===0)await api("/authentication");
+
+   // Itens são consultados em lotes concorrentes em vez de um de cada vez.
+   // O tempo do processo inteiro é dominado pela espera da resposta do
+   // TMDB pela rede, não pelo processamento local — então rodar vários
+   // itens ao mesmo tempo sobrepõe essas esperas e reduz o tempo total
+   // várias vezes, sem precisar de mais poder de CPU.
+   const BATCH=6;
+   for(let i=startIndex;i<items.length;i+=BATCH){
+     if(analysisState.paused){
+       analysisState.index=i;
+       $("progressText").innerHTML=`<span class="hint">⏸️ Análise pausada em ${i}/${items.length}. Clique em “Continuar”.</span>`;
+       $("pause").disabled=true;
+       $("resume").disabled=false;
+       return;
+     }
+
+     const end=Math.min(i+BATCH,items.length);
+     await Promise.all(
+       Array.from({length:end-i},(_,k)=>i+k).map(async j=>{
+         items[j]=await searchItem(items[j]);
+       })
+     );
+
+     analysisState.index=end;
+     $("bar").style.width=(end/items.length*100)+"%";
+     $("progressText").textContent=`${end}/${items.length} processados...`;
+     render();
+     stats();
+
+     if(analysisState.paused){
+       analysisState.index=end;
+       $("progressText").innerHTML=`<span class="hint">⏸️ Análise pausada em ${end}/${items.length}. Clique em “Continuar”.</span>`;
+       $("pause").disabled=true;
+       $("resume").disabled=false;
+       return;
+     }
+   }
+
+   analysisState.running=false;
+   analysisState.index=items.length;
+   $("progressText").innerHTML='<span class="ok">✓ Análise TMDB concluída.</span>';
+ }catch(e){
+   analysisState.running=false;
+   $("progressText").innerHTML='<span class="err">Erro: '+esc(e.message)+"</span>";
+ }finally{
+   $("process").disabled=analysisState.running;
+   if(!analysisState.paused){
+     $("pause").disabled=true;
+     $("resume").disabled=true;
+   }
+ }
+}
+
+$("pause").onclick=()=>{
+ if(!analysisState.running)return;
+ analysisState.paused=true;
+ $("pause").disabled=true;
+ $("resume").disabled=false;
+ $("progressText").innerHTML=`<span class="hint">⏸️ Parando após o item atual (${analysisState.index+1}/${items.length})...</span>`;
+};
+
+$("resume").onclick=()=>{
+ if(!analysisState.paused)return;
+ const idx=analysisState.index;
+ $("resume").disabled=true;
+ $("pause").disabled=false;
+ analysisState.paused=false;
+ process(idx);
+};
+
+$("process").onclick=()=>process(0);
+
+function makeM3U(list){
+ let out="#EXTM3U\n";
+ for(const x of list)out+=`#EXTINF:-1,${x.name}\n${x.url}\n`;
+ return out;
+}
+function download(name,data,type="text/plain"){
+ const blob=new Blob([data],{type:type+";charset=utf-8"}),a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+$("all").onclick=()=>download("M3U_organizado.m3u",makeM3U(items));
+$("moviesBtn").onclick=()=>download("filmes.m3u",makeM3U(items.filter(x=>x.type==="Filme")));
+$("seriesBtn").onclick=()=>download("series.m3u",makeM3U(items.filter(x=>x.type==="Série")));
+function exportByType(type, filename){
+  const rows = items.filter(x => x.type === type);
+  const content = ["Gênero | Nome | Link", ...rows.map(x => `${x.genre||""} | ${x.name||""} | ${x.url||""}`)].join("\n");
+  download(filename, content);
+}
+$("exportMovies").onclick=()=>exportByType("Filme","M3U_Filmes_Genero_Nome_Link.txt");
+$("exportSeries").onclick=()=>exportByType("Série","M3U_Series_Genero_Nome_Link.txt");
+$("csvBtn").onclick=()=>{
+ let s="Nome,Tipo,Categoria,Confianca,Correspondencia TMDB,URL\n";
+ for(const x of items)s+=`"${x.name.replace(/"/g,'""')}","${x.type}","${x.genre}",${x.confidence},"${(x.matched||"").replace(/"/g,'""')}","${x.url.replace(/"/g,'""')}"\\n`;
+ download("revisao_m3u.csv","\ufeff"+s,"text/csv");
+};
+</script>
+</body>
+</html>
