@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Conversor MP3 → WAV</title>
+<title>Conversor para WAV</title>
 <style>
 :root{--bg:#080d18;--card:#111a2d;--card2:#0c1424;--line:#26324b;--text:#edf3ff;--muted:#94a1bd;--blue:#6ea8fe;--green:#4fd17b;--red:#ff6868;--yellow:#ffd166}
 *{box-sizing:border-box}
@@ -42,8 +42,8 @@ audio{width:100%;margin-top:10px;height:38px}
 <body>
 <div class="wrap">
 <div class="hero">
-<h1>🎵 Conversor MP3 → WAV</h1>
-<p>A conversão acontece no seu navegador: os arquivos não são enviados para nenhum servidor e a página funciona até sem internet.</p>
+<h1>🎵 Conversor para WAV</h1>
+<p>Transforma MP3 e vídeos (como o MP4 baixado do YouTube Studio) em áudio WAV. A conversão acontece no seu navegador: os arquivos não são enviados para nenhum servidor e a página funciona até sem internet.</p>
 </div>
 
 <div class="card">
@@ -51,7 +51,7 @@ audio{width:100%;margin-top:10px;height:38px}
 <div class="opts">
 <label>Taxa de amostragem
 <select id="rate">
-<option value="orig">Igual ao MP3 (recomendado)</option>
+<option value="orig">Igual ao original (recomendado)</option>
 <option value="48000">48.000 Hz</option>
 <option value="44100">44.100 Hz (CD)</option>
 <option value="32000">32.000 Hz</option>
@@ -62,7 +62,7 @@ audio{width:100%;margin-top:10px;height:38px}
 </select></label>
 <label>Canais
 <select id="channels">
-<option value="orig">Igual ao MP3</option>
+<option value="orig">Igual ao original</option>
 <option value="1">Mono</option>
 <option value="2">Estéreo</option>
 </select></label>
@@ -76,16 +76,18 @@ audio{width:100%;margin-top:10px;height:38px}
 <p class="hint">
 Na dúvida, deixe como está. Centrais telefônicas e URAs costumam pedir <b>8.000 Hz, mono, 16 bits</b>.
 Converter para WAV não melhora o som: o arquivo só fica num formato sem compressão, maior (cerca de 10 MB por minuto em estéreo) e aceito por mais programas.
+Vídeos com som 5.1 viram estéreo.
 </p>
 </div>
 
 <div class="card">
-<h3>2. Escolha os arquivos MP3</h3>
+<h3>2. Escolha os arquivos</h3>
 <div class="drop" id="drop" role="button" tabindex="0">
 <b>📂 Clique para escolher os arquivos</b>
-<span class="hint">ou arraste os .mp3 para esta página (pode ser vários de uma vez). A conversão começa sozinha.</span>
+<span class="hint">ou arraste para esta página: MP3, vídeos (MP4, WebM, MOV…) e outros áudios (M4A, OGG, FLAC, WAV…). Pode ser vários de uma vez; a conversão começa sozinha.</span>
 </div>
-<input id="file" type="file" accept=".mp3,audio/mpeg" multiple hidden>
+<input id="file" type="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.m4v,.mov,.webm,.mkv,.ogg,.oga,.opus,.aac,.flac,.wav,.3gp" multiple hidden>
+<p class="hint"><b>Vídeos do seu canal no YouTube:</b> abra o YouTube Studio → Conteúdo, passe o mouse no vídeo, clique em ⋮ (Opções) → Baixar e depois arraste o MP4 baixado para cá.</p>
 </div>
 
 <div class="card">
@@ -145,23 +147,115 @@ const tick = (() => {
 function friendlyError(e) {
   if (e && e.forUser) return e.message;
   if (e instanceof RangeError || /memory|alloc/i.test(e && e.message)) {
-    return 'Faltou memória no navegador para este arquivo (ele é muito longo). Tente 16 bits, mono ou uma taxa menor.';
+    return 'Faltou memória no navegador para este arquivo (ele é muito grande ou longo). Tente 16 bits, mono ou uma taxa menor.';
   }
+  if (e && e.name === 'NotReadableError') return 'Não consegui ler o arquivo do disco. Ele pode ser grande demais para o navegador ou ter sido movido.';
   return 'Erro inesperado: ' + ((e && e.message) || e);
 }
 
-/* ---------- leitura do MP3 ---------- */
-// Lê a taxa de amostragem no cabeçalho do primeiro quadro MP3 (depois das tags ID3).
+/* ---------- leitura do arquivo ---------- */
+// Descobre a taxa de amostragem original no cabeçalho do arquivo.
 // Precisamos dela porque o navegador decodifica já convertendo para a taxa que pedirmos.
-function mp3SampleRate(b) {
-  const RATES = [[11025, 12000, 8000], null, [22050, 24000, 16000], [44100, 48000, 32000]]; // MPEG 2.5, reservado, MPEG 2, MPEG 1
-  const KBPS_V1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
-  const KBPS_V2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+const COMMON_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 64000, 88200, 96000, 176400, 192000];
+const text = (b, p, n) => String.fromCharCode(...b.subarray(p, p + n));
+function findText(b, s, from, to) {
+  search: for (let i = b.indexOf(s.charCodeAt(0), from); i >= 0 && i + s.length <= to; i = b.indexOf(s.charCodeAt(0), i + 1)) {
+    for (let k = 1; k < s.length; k++) if (b[i + k] !== s.charCodeAt(k)) continue search;
+    return i;
+  }
+  return -1;
+}
+
+function sourceSampleRate(b) {
+  const rate = detectRate(b);
+  return rate >= 3000 && rate <= 768000 ? Math.round(rate) : null; // faixa aceita pelo Web Audio
+}
+
+function detectRate(b) {
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
   let i = 0;
-  while (i + 10 <= b.length && b[i] === 0x49 && b[i + 1] === 0x44 && b[i + 2] === 0x33) { // "ID3"
+  while (i + 10 <= b.length && text(b, i, 3) === 'ID3') { // tags ID3 no começo (MP3, AAC, FLAC)
     const size = (b[i + 6] & 127) << 21 | (b[i + 7] & 127) << 14 | (b[i + 8] & 127) << 7 | (b[i + 9] & 127);
     i += 10 + size + (b[i + 5] & 0x10 ? 10 : 0);
   }
+  if (i + 32 > b.length) return null;
+  const magic = text(b, i, 4);
+  if ((magic === 'RIFF' || magic === 'RF64') && text(b, i + 8, 4) === 'WAVE') return wavRate(b, dv, i);
+  if (magic === 'fLaC') return b[i + 18] << 12 | b[i + 19] << 4 | b[i + 20] >> 4;
+  if (magic === 'OggS') return oggRate(b, dv, i);
+  if (magic === '\x1A\x45\xDF\xA3') return matroskaRate(b, dv, i); // WebM, MKV
+  if (['ftyp', 'moov', 'mdat', 'free', 'skip', 'wide'].includes(text(b, i + 4, 4))) return mp4Rate(b, dv, i); // MP4, M4A, MOV
+  if (b[i] === 0xFF && (b[i + 1] & 0xF6) === 0xF0) { // AAC solto (ADTS)
+    return [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350][b[i + 2] >> 2 & 15] || null;
+  }
+  return mp3Rate(b, i);
+}
+
+function wavRate(b, dv, i) {
+  for (let p = i + 12; p + 16 <= b.length;) {
+    const size = dv.getUint32(p + 4, true);
+    if (text(b, p, 4) === 'fmt ') return dv.getUint32(p + 12, true);
+    p += 8 + size + (size & 1);
+  }
+  return null;
+}
+
+function oggRate(b, dv, i) {
+  const end = Math.min(b.length, i + 65536);
+  if (findText(b, 'OpusHead', i, end) >= 0) return 48000; // Opus sempre sai em 48 kHz
+  const v = findText(b, '\x01vorbis', i, end);
+  return v >= 0 && v + 16 <= b.length ? dv.getUint32(v + 12, true) : null;
+}
+
+function matroskaRate(b, dv, i) {
+  const end = Math.min(b.length, i + 1048576);
+  if (findText(b, 'A_OPUS', i, end) >= 0) return 48000;
+  // Elemento SamplingFrequency (0xB5): a taxa guardada como número decimal de 4 ou 8 bytes.
+  for (let p = b.indexOf(0xB5, i); p >= 0 && p + 10 <= end; p = b.indexOf(0xB5, p + 1)) {
+    const rate = b[p + 1] === 0x88 ? dv.getFloat64(p + 2) : b[p + 1] === 0x84 ? dv.getFloat32(p + 2) : 0;
+    if (COMMON_RATES.includes(rate)) return rate;
+  }
+  return null;
+}
+
+function mp4Rate(b, dv, start) {
+  function* boxes(from, to) {
+    for (let p = from; p + 8 <= to;) {
+      let size = dv.getUint32(p), head = 8;
+      if (size === 1 && p + 16 <= to) { size = dv.getUint32(p + 8) * 4294967296 + dv.getUint32(p + 12); head = 16; }
+      else if (size === 0) size = to - p;
+      if (size < head || p + size > to) return;
+      yield { type: text(b, p + 4, 4), from: p + head, to: p + size };
+      p += size;
+    }
+  }
+  const child = (box, type) => { for (const x of boxes(box.from, box.to)) if (x.type === type) return x; return null; };
+  const moov = child({ from: start, to: b.length }, 'moov');
+  for (const trak of moov ? boxes(moov.from, moov.to) : []) {
+    if (trak.type !== 'trak') continue;
+    const mdia = child(trak, 'mdia'), hdlr = mdia && child(mdia, 'hdlr');
+    if (!hdlr || text(b, hdlr.from + 8, 4) !== 'soun') continue; // só a trilha de áudio
+    const minf = child(mdia, 'minf'), stbl = minf && child(minf, 'stbl'), stsd = stbl && child(stbl, 'stsd');
+    if (stsd && stsd.from + 44 <= stsd.to) {
+      const e = stsd.from + 8; // primeira descrição de áudio
+      if (text(b, e + 4, 4) === 'Opus') return 48000;
+      const rate = dv.getUint16(e + 32);
+      if (dv.getUint16(e + 16) < 2 && COMMON_RATES.includes(rate)) return rate;
+    }
+    const mdhd = child(mdia, 'mdhd'); // a escala de tempo da trilha costuma ser a própria taxa
+    if (mdhd && mdhd.from + 24 <= mdhd.to) {
+      const t = dv.getUint32(mdhd.from + (b[mdhd.from] === 1 ? 20 : 12));
+      if (COMMON_RATES.includes(t)) return t;
+    }
+  }
+  return null;
+}
+
+// MP3: taxa do cabeçalho do primeiro quadro.
+function mp3Rate(b, i) {
+  const RATES = [[11025, 12000, 8000], null, [22050, 24000, 16000], [44100, 48000, 32000]]; // MPEG 2.5, reservado, MPEG 2, MPEG 1
+  const KBPS_V1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+  const KBPS_V2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
   const header = j => {
     if (j + 4 > b.length || b[j] !== 0xFF || (b[j + 1] & 0xE0) !== 0xE0) return null;
     const ver = b[j + 1] >> 3 & 3, layer = b[j + 1] >> 1 & 3, br = b[j + 2] >> 4, sr = b[j + 2] >> 2 & 3;
@@ -195,19 +289,37 @@ async function decode(bytes, rate) {
     });
   } catch (e) {
     if (e instanceof RangeError) throw e;
-    throw userError('Não consegui ler este arquivo. Ele pode estar corrompido ou não ser um MP3 de verdade.');
+    throw userError('Não consegui ler o som deste arquivo. Ele pode estar corrompido, não ter áudio ou estar num formato que este navegador não abre (tente o Chrome ou o Edge).');
   }
 }
 
+// Som 5.1 ou quadrifônico vira estéreo com a mesma mistura do Web Audio:
+// o canal central (onde costuma ficar a voz) entra nos dois lados.
+function toStereo(src) {
+  const n = src[0].length, k = Math.SQRT1_2;
+  if (src.length === 6) { // L R C LFE SL SR
+    const [l, r, c, , sl, sr] = src, L = new Float32Array(n), R = new Float32Array(n);
+    for (let i = 0; i < n; i++) { L[i] = l[i] + k * (c[i] + sl[i]); R[i] = r[i] + k * (c[i] + sr[i]); }
+    return [L, R];
+  }
+  if (src.length === 4) { // L R SL SR
+    const [l, r, sl, sr] = src, L = new Float32Array(n), R = new Float32Array(n);
+    for (let i = 0; i < n; i++) { L[i] = 0.5 * (l[i] + sl[i]); R[i] = 0.5 * (r[i] + sr[i]); }
+    return [L, R];
+  }
+  return src.slice(0, 2);
+}
+
 function mapChannels(audio, mode) {
-  const src = [];
+  let src = [];
   for (let c = 0; c < audio.numberOfChannels; c++) src.push(audio.getChannelData(c));
-  if (mode === '1' && src.length > 1) {
-    const mono = new Float32Array(audio.length);
-    for (const ch of src) for (let i = 0; i < mono.length; i++) mono[i] += ch[i] / src.length;
+  if (src.length > 2) src = toStereo(src);
+  if (mode === '1' && src.length === 2) {
+    const [l, r] = src, mono = new Float32Array(l.length);
+    for (let i = 0; i < mono.length; i++) mono[i] = (l[i] + r[i]) / 2;
     return [mono];
   }
-  if (mode === '2') return src.length === 1 ? [src[0], src[0]] : src.slice(0, 2);
+  if (mode === '2' && src.length === 1) return [src[0], src[0]];
   return src;
 }
 
@@ -253,15 +365,17 @@ async function encodeWav(chans, rate, format, onProgress) {
 }
 
 /* ---------- fila de conversão ---------- */
+const MEDIA_EXT = /\.(mp3|mp4|m4a|m4v|mov|webm|mkv|ogg|oga|opus|aac|flac|wav|3gp)$/i;
+const baseName = name => name.replace(/\.[^.]*$/, '');
 function addFiles(files) {
   const ignored = [];
   for (const file of files) {
-    if (!/\.mp3$/i.test(file.name) && !/^audio\/(mpeg|mp3)$/.test(file.type)) { ignored.push(file.name); continue; }
+    if (!MEDIA_EXT.test(file.name) && !/^(audio|video)\//.test(file.type)) { ignored.push(file.name); continue; }
     const it = { id: nextId++, file, status: 'fila', progress: 0 };
     items.push(it);
     buildRow(it);
   }
-  note = ignored.length ? `Ignorado (não é MP3): ${ignored.join(', ')}` : '';
+  note = ignored.length ? `Ignorado (não é áudio nem vídeo): ${ignored.join(', ')}` : '';
   refresh();
   convertAll();
 }
@@ -285,9 +399,9 @@ async function convertItem(it) {
   updateRow(it);
   try {
     const bytes = await it.file.arrayBuffer();
-    const srcRate = mp3SampleRate(new Uint8Array(bytes));
+    const srcRate = sourceSampleRate(new Uint8Array(bytes));
     const rate = opt.rate === 'orig' ? (srcRate || 44100) : +opt.rate;
-    Object.assign(it, { phase: 'Decodificando o MP3…', progress: 0.05 });
+    Object.assign(it, { phase: 'Decodificando o áudio…', progress: 0.05 });
     updateRow(it);
     await tick();
     const audio = await decode(bytes, rate); // decodeAudioData "consome" bytes
@@ -334,8 +448,9 @@ function buildRow(it) {
 
 function updateRow(it) {
   const r = it.row, inf = it.info, ready = it.status === 'pronto';
-  let meta = `MP3 · ${fmtSize(it.file.size)}`;
-  if (inf) meta += ` · ${inf.srcRate ? fmtRate(inf.srcRate) : 'taxa não detectada (usei 44.100 Hz)'} · ${chName(inf.srcCh)}`;
+  const ext = /\.([^.]+)$/.exec(it.file.name);
+  let meta = `${ext ? ext[1].toUpperCase() : 'Arquivo'} · ${fmtSize(it.file.size)}`;
+  if (inf) meta += ` · ${inf.srcRate ? fmtRate(inf.srcRate) : 'taxa original não detectada'} · ${chName(inf.srcCh)}`;
   r.meta.textContent = meta;
 
   const pct = Math.round(it.progress * 100);
@@ -355,7 +470,7 @@ function updateRow(it) {
   r.audio.classList.toggle('hidden', !ready);
   if (ready && r.dl.getAttribute('href') !== it.url) {
     r.dl.href = it.url;
-    r.dl.download = it.file.name.replace(/\.mp3$/i, '') + '.wav';
+    r.dl.download = baseName(it.file.name) + '.wav';
     r.audio.src = it.url;
   }
   if (!ready && r.dl.hasAttribute('href')) {
@@ -477,7 +592,7 @@ async function makeZip(list, onProgress) {
 
 $('zip').onclick = async () => {
   // Cópia fixa: tirar um item da lista no meio não atrapalha o .zip.
-  const list = items.filter(i => i.status === 'pronto').map(i => ({ base: i.file.name.replace(/\.mp3$/i, ''), blob: i.blob }));
+  const list = items.filter(i => i.status === 'pronto').map(i => ({ base: baseName(i.file.name), blob: i.blob }));
   busy = true;
   note = 'Preparando o .zip…';
   refresh();
