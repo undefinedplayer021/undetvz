@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conversor MP3 → WAV</title>
+<style>
+:root{--bg:#080d18;--card:#111a2d;--card2:#0c1424;--line:#26324b;--text:#edf3ff;--muted:#94a1bd;--blue:#6ea8fe;--green:#4fd17b;--red:#ff6868;--yellow:#ffd166}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg) radial-gradient(circle at 20% 0,#182746 0,#080d18 42%) fixed;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+.wrap{max-width:900px;margin:auto;padding:26px}
+.hero h1{margin:0;font-size:29px}.hero p{color:var(--muted);margin:6px 0 20px}
+.card{background:rgba(17,26,45,.96);border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 15px 45px #0004}
+h3{margin-top:0}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.btn{border:0;border-radius:9px;padding:10px 14px;background:#273450;color:#fff;cursor:pointer;font:inherit;font-weight:650;text-decoration:none;display:inline-block}
+.btn:hover{filter:brightness(1.12)}.primary{background:var(--blue);color:#07101f}.green{background:var(--green);color:#07140b}.danger{background:#53252b}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+select{background:#070c16;color:#fff;border:1px solid var(--line);border-radius:8px;padding:9px;font:inherit}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.opts label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.hint{font-size:12px;color:var(--muted);line-height:1.5}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:34px 16px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop:focus-visible,.drop.over{border-color:var(--blue);background:#6ea8fe12;outline:0}
+.drop b{font-size:18px;display:block;margin-bottom:6px}
+.status{padding:10px 12px;border-radius:9px;background:var(--card2);margin-top:12px}
+.item{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.item .top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.item .info{min-width:0;flex:1 1 260px}
+.name{font-weight:650;overflow-wrap:anywhere}
+.meta{font-size:12px;color:var(--muted);margin-top:3px}
+.state{font-size:13px;margin-top:5px}
+.ok{color:var(--green)}.err{color:var(--red)}.warn{color:var(--yellow)}
+.progress{height:6px;background:#070c16;border-radius:20px;overflow:hidden;margin-top:9px}
+.bar{height:100%;width:0;background:var(--blue);transition:width .15s}
+.bar.done{background:var(--green)}.bar.fail{background:var(--red)}
+audio{width:100%;margin-top:10px;height:38px}
+.hidden{display:none!important}
+@media(max-width:700px){.wrap{padding:13px}.hero h1{font-size:23px}.opts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hero">
+<h1>🎵 Conversor MP3 → WAV</h1>
+<p>A conversão acontece no seu navegador: os arquivos não são enviados para nenhum servidor e a página funciona até sem internet.</p>
+</div>
+
+<div class="card">
+<h3>1. Formato do WAV</h3>
+<div class="opts">
+<label>Taxa de amostragem
+<select id="rate">
+<option value="orig">Igual ao MP3 (recomendado)</option>
+<option value="48000">48.000 Hz</option>
+<option value="44100">44.100 Hz (CD)</option>
+<option value="32000">32.000 Hz</option>
+<option value="22050">22.050 Hz</option>
+<option value="16000">16.000 Hz</option>
+<option value="11025">11.025 Hz</option>
+<option value="8000">8.000 Hz (telefone)</option>
+</select></label>
+<label>Canais
+<select id="channels">
+<option value="orig">Igual ao MP3</option>
+<option value="1">Mono</option>
+<option value="2">Estéreo</option>
+</select></label>
+<label>Resolução
+<select id="format">
+<option value="pcm16">16 bits (padrão, abre em tudo)</option>
+<option value="pcm24">24 bits</option>
+<option value="float32">32 bits float</option>
+</select></label>
+</div>
+<p class="hint">
+Na dúvida, deixe como está. Centrais telefônicas e URAs costumam pedir <b>8.000 Hz, mono, 16 bits</b>.
+Converter para WAV não melhora o som: o arquivo só fica num formato sem compressão, maior (cerca de 10 MB por minuto em estéreo) e aceito por mais programas.
+</p>
+</div>
+
+<div class="card">
+<h3>2. Escolha os arquivos MP3</h3>
+<div class="drop" id="drop" role="button" tabindex="0">
+<b>📂 Clique para escolher os arquivos</b>
+<span class="hint">ou arraste os .mp3 para esta página (pode ser vários de uma vez). A conversão começa sozinha.</span>
+</div>
+<input id="file" type="file" accept=".mp3,audio/mpeg" multiple hidden>
+</div>
+
+<div class="card">
+<h3>3. Baixar os WAV</h3>
+<div class="row">
+<button class="btn green" id="zip" disabled>⬇️ Baixar todos (.zip)</button>
+<button class="btn primary" id="convert" disabled>🔄 Converter de novo com as opções atuais</button>
+<button class="btn danger" id="clear" disabled>Limpar lista</button>
+</div>
+<div id="status" class="status">Nenhum arquivo ainda.</div>
+<div id="list"></div>
+</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const OPT_IDS = ['rate', 'channels', 'format'];
+const OPT_KEY = 'conversorMp3Wav.opcoes';
+const FORMAT_LABEL = { pcm16: '16 bits', pcm24: '24 bits', float32: '32 bits float' };
+const items = [];
+let busy = false, nextId = 1, note = '';
+
+/* ---------- opções ---------- */
+try {
+  const saved = JSON.parse(localStorage.getItem(OPT_KEY) || '{}');
+  for (const id of OPT_IDS) if ([...$(id).options].some(o => o.value === saved[id])) $(id).value = saved[id];
+} catch {}
+const options = () => ({ rate: $('rate').value, channels: $('channels').value, format: $('format').value });
+const optionsKey = () => JSON.stringify(options());
+for (const id of OPT_IDS) $(id).addEventListener('change', () => {
+  try { localStorage.setItem(OPT_KEY, optionsKey()); } catch {}
+  refresh();
+});
+
+/* ---------- utilidades ---------- */
+const userError = msg => Object.assign(new Error(msg), { forUser: true });
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const fmtRate = n => n.toLocaleString('pt-BR') + ' Hz';
+const chName = n => n === 1 ? 'mono' : n === 2 ? 'estéreo' : `${n} canais`;
+function fmtSize(n) {
+  const nf = (v, d) => v.toLocaleString('pt-BR', { maximumFractionDigits: d });
+  if (n < 1048576) return nf(n / 1024, 0) + ' KB';
+  if (n < 1073741824) return nf(n / 1048576, 1) + ' MB';
+  return nf(n / 1073741824, 2) + ' GB';
+}
+function fmtTime(s) {
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+// Devolve o controle ao navegador sem o atraso de setTimeout em abas de fundo.
+const tick = (() => {
+  const ch = new MessageChannel(), waiting = [];
+  ch.port1.onmessage = () => waiting.shift()();
+  return () => new Promise(r => { waiting.push(r); ch.port2.postMessage(0); });
+})();
+function friendlyError(e) {
+  if (e && e.forUser) return e.message;
+  if (e instanceof RangeError || /memory|alloc/i.test(e && e.message)) {
+    return 'Faltou memória no navegador para este arquivo (ele é muito longo). Tente 16 bits, mono ou uma taxa menor.';
+  }
+  return 'Erro inesperado: ' + ((e && e.message) || e);
+}
+
+/* ---------- leitura do MP3 ---------- */
+// Lê a taxa de amostragem no cabeçalho do primeiro quadro MP3 (depois das tags ID3).
+// Precisamos dela porque o navegador decodifica já convertendo para a taxa que pedirmos.
+function mp3SampleRate(b) {
+  const RATES = [[11025, 12000, 8000], null, [22050, 24000, 16000], [44100, 48000, 32000]]; // MPEG 2.5, reservado, MPEG 2, MPEG 1
+  const KBPS_V1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+  const KBPS_V2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+  let i = 0;
+  while (i + 10 <= b.length && b[i] === 0x49 && b[i + 1] === 0x44 && b[i + 2] === 0x33) { // "ID3"
+    const size = (b[i + 6] & 127) << 21 | (b[i + 7] & 127) << 14 | (b[i + 8] & 127) << 7 | (b[i + 9] & 127);
+    i += 10 + size + (b[i + 5] & 0x10 ? 10 : 0);
+  }
+  const header = j => {
+    if (j + 4 > b.length || b[j] !== 0xFF || (b[j + 1] & 0xE0) !== 0xE0) return null;
+    const ver = b[j + 1] >> 3 & 3, layer = b[j + 1] >> 1 & 3, br = b[j + 2] >> 4, sr = b[j + 2] >> 2 & 3;
+    if (ver === 1 || layer !== 1 || br === 15 || sr === 3) return null; // layer 1 = Layer III
+    const rate = RATES[ver][sr], kbps = (ver === 3 ? KBPS_V1 : KBPS_V2)[br];
+    const len = kbps ? Math.floor((ver === 3 ? 144000 : 72000) * kbps / rate) + (b[j + 2] >> 1 & 1) : 0;
+    return { ver, sr, rate, len };
+  };
+  let guess = null;
+  for (const end = Math.min(b.length, i + 262144); i < end; i++) {
+    const h = header(i);
+    if (!h) continue;
+    if (guess === null) guess = h.rate;
+    if (!h.len) continue;
+    // Confirma que o próximo quadro começa onde deveria, para não confundir com bytes soltos.
+    if (i + h.len + 4 > b.length) return h.rate;
+    const next = header(i + h.len);
+    if (next && next.ver === h.ver && next.sr === h.sr) return h.rate;
+  }
+  return guess;
+}
+
+async function decode(bytes, rate) {
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!Ctx) throw userError('Este navegador não consegue decodificar áudio. Use o Chrome, Edge ou Firefox atualizados.');
+  const ctx = new Ctx(1, 1, rate);
+  try {
+    return await new Promise((ok, fail) => {
+      const p = ctx.decodeAudioData(bytes, ok, fail);
+      if (p && p.then) p.then(ok, fail);
+    });
+  } catch (e) {
+    if (e instanceof RangeError) throw e;
+    throw userError('Não consegui ler este arquivo. Ele pode estar corrompido ou não ser um MP3 de verdade.');
+  }
+}
+
+function mapChannels(audio, mode) {
+  const src = [];
+  for (let c = 0; c < audio.numberOfChannels; c++) src.push(audio.getChannelData(c));
+  if (mode === '1' && src.length > 1) {
+    const mono = new Float32Array(audio.length);
+    for (const ch of src) for (let i = 0; i < mono.length; i++) mono[i] += ch[i] / src.length;
+    return [mono];
+  }
+  if (mode === '2') return src.length === 1 ? [src[0], src[0]] : src.slice(0, 2);
+  return src;
+}
+
+/* ---------- escrita do WAV ---------- */
+async function encodeWav(chans, rate, format, onProgress) {
+  const nCh = chans.length, frames = chans[0].length;
+  const isFloat = format === 'float32', bps = format === 'pcm16' ? 2 : format === 'pcm24' ? 3 : 4;
+  const blockAlign = nCh * bps, dataSize = frames * blockAlign, pad = dataSize & 1;
+  const headerSize = isFloat ? 58 : 44; // float leva o campo cbSize e o bloco "fact"
+  if (headerSize - 8 + dataSize + pad > 0xFFFFFFFF) {
+    throw userError('O WAV passaria de 4 GB, o limite do formato. Escolha 16 bits, mono ou uma taxa menor.');
+  }
+  const v = new DataView(new ArrayBuffer(headerSize + dataSize + pad));
+  let p = 0;
+  const str = s => { for (let i = 0; i < s.length; i++) v.setUint8(p++, s.charCodeAt(i)); };
+  const u16 = x => { v.setUint16(p, x, true); p += 2; };
+  const u32 = x => { v.setUint32(p, x, true); p += 4; };
+  str('RIFF'); u32(headerSize - 8 + dataSize + pad); str('WAVE');
+  str('fmt '); u32(isFloat ? 18 : 16); u16(isFloat ? 3 : 1); u16(nCh); u32(rate); u32(rate * blockAlign); u16(blockAlign); u16(bps * 8);
+  if (isFloat) { u16(0); str('fact'); u32(4); u32(frames); }
+  str('data'); u32(dataSize);
+
+  const CHUNK = 262144;
+  for (let start = 0; start < frames; start += CHUNK) {
+    const end = Math.min(frames, start + CHUNK);
+    for (let i = start; i < end; i++) {
+      for (let c = 0; c < nCh; c++) {
+        let s = chans[c][i];
+        if (isFloat) { v.setFloat32(p, s, true); p += 4; continue; }
+        s = s > 1 ? 1 : s < -1 ? -1 : s;
+        if (bps === 2) {
+          v.setInt16(p, Math.round(s < 0 ? s * 0x8000 : s * 0x7FFF), true); p += 2;
+        } else {
+          const x = Math.round(s < 0 ? s * 0x800000 : s * 0x7FFFFF);
+          v.setUint8(p, x & 255); v.setUint8(p + 1, x >> 8 & 255); v.setUint8(p + 2, x >> 16 & 255); p += 3;
+        }
+      }
+    }
+    onProgress(end / frames);
+    await tick();
+  }
+  return v.buffer;
+}
+
+/* ---------- fila de conversão ---------- */
+function addFiles(files) {
+  const ignored = [];
+  for (const file of files) {
+    if (!/\.mp3$/i.test(file.name) && !/^audio\/(mpeg|mp3)$/.test(file.type)) { ignored.push(file.name); continue; }
+    const it = { id: nextId++, file, status: 'fila', progress: 0 };
+    items.push(it);
+    buildRow(it);
+  }
+  note = ignored.length ? `Ignorado (não é MP3): ${ignored.join(', ')}` : '';
+  refresh();
+  convertAll();
+}
+
+async function convertAll() {
+  if (busy) return;
+  busy = true;
+  refresh();
+  try {
+    let it;
+    while ((it = items.find(i => i.status === 'fila'))) await convertItem(it);
+  } finally {
+    busy = false;
+    refresh();
+  }
+}
+
+async function convertItem(it) {
+  const opt = options(), key = JSON.stringify(opt);
+  Object.assign(it, { status: 'convertendo', phase: 'Lendo o arquivo…', progress: 0, error: '' });
+  updateRow(it);
+  try {
+    const bytes = await it.file.arrayBuffer();
+    const srcRate = mp3SampleRate(new Uint8Array(bytes));
+    const rate = opt.rate === 'orig' ? (srcRate || 44100) : +opt.rate;
+    Object.assign(it, { phase: 'Decodificando o MP3…', progress: 0.05 });
+    updateRow(it);
+    await tick();
+    const audio = await decode(bytes, rate); // decodeAudioData "consome" bytes
+    const chans = mapChannels(audio, opt.channels);
+    it.phase = 'Gerando o WAV…';
+    const wav = await encodeWav(chans, rate, opt.format, f => { it.progress = 0.15 + 0.85 * f; updateRow(it); });
+    const blob = new Blob([wav], { type: 'audio/wav' });
+    clearOutput(it);
+    Object.assign(it, {
+      status: 'pronto', key, blob, url: URL.createObjectURL(blob),
+      info: { srcRate, srcCh: audio.numberOfChannels, rate, ch: chans.length, format: opt.format, duration: audio.length / rate }
+    });
+  } catch (e) {
+    if (!(e && e.forUser)) console.error(e);
+    clearOutput(it);
+    Object.assign(it, { status: 'erro', error: friendlyError(e) });
+  }
+  updateRow(it);
+}
+
+function clearOutput(it) {
+  if (it.url) URL.revokeObjectURL(it.url);
+  it.url = it.blob = null;
+}
+
+/* ---------- tela ---------- */
+function buildRow(it) {
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.innerHTML = `<div class="top"><div class="info"><div class="name"></div><div class="meta"></div><div class="state"></div></div>
+<div class="row"><a class="btn green dl hidden">⬇️ Baixar WAV</a><button class="btn rm" title="Tirar da lista">✕</button></div></div>
+<div class="progress"><div class="bar"></div></div><audio controls preload="none" class="hidden"></audio>`;
+  const q = s => el.querySelector(s);
+  it.row = { el, name: q('.name'), meta: q('.meta'), state: q('.state'), dl: q('.dl'), rm: q('.rm'), bar: q('.bar'), audio: q('audio') };
+  it.row.name.textContent = it.file.name;
+  it.row.rm.onclick = () => {
+    clearOutput(it);
+    el.remove();
+    items.splice(items.indexOf(it), 1);
+    refresh();
+  };
+  $('list').append(el);
+}
+
+function updateRow(it) {
+  const r = it.row, inf = it.info, ready = it.status === 'pronto';
+  let meta = `MP3 · ${fmtSize(it.file.size)}`;
+  if (inf) meta += ` · ${inf.srcRate ? fmtRate(inf.srcRate) : 'taxa não detectada (usei 44.100 Hz)'} · ${chName(inf.srcCh)}`;
+  r.meta.textContent = meta;
+
+  const pct = Math.round(it.progress * 100);
+  if (it.status === 'fila') { r.state.textContent = '⏳ Na fila'; r.state.className = 'state'; }
+  if (it.status === 'convertendo') { r.state.textContent = `🔄 ${it.phase} ${pct}%`; r.state.className = 'state'; }
+  if (it.status === 'erro') { r.state.textContent = '❌ ' + it.error; r.state.className = 'state err'; }
+  if (ready) {
+    const stale = it.key !== optionsKey();
+    r.state.textContent = `✅ WAV pronto: ${fmtSize(it.blob.size)} · ${fmtTime(inf.duration)} · ${fmtRate(inf.rate)} · ${chName(inf.ch)} · ${FORMAT_LABEL[inf.format]}`
+      + (stale ? ' — ⚠️ as opções mudaram; clique em “Converter de novo” para refazer' : '');
+    r.state.className = 'state ' + (stale ? 'warn' : 'ok');
+  }
+
+  r.bar.style.width = (ready || it.status === 'erro' ? 100 : pct) + '%';
+  r.bar.className = 'bar' + (ready ? ' done' : it.status === 'erro' ? ' fail' : '');
+  r.dl.classList.toggle('hidden', !ready);
+  r.audio.classList.toggle('hidden', !ready);
+  if (ready && r.dl.getAttribute('href') !== it.url) {
+    r.dl.href = it.url;
+    r.dl.download = it.file.name.replace(/\.mp3$/i, '') + '.wav';
+    r.audio.src = it.url;
+  }
+  if (!ready && r.dl.hasAttribute('href')) {
+    r.dl.removeAttribute('href');
+    r.audio.removeAttribute('src');
+    r.audio.load();
+  }
+  r.rm.disabled = it.status === 'convertendo';
+}
+
+function refresh() {
+  const key = optionsKey();
+  const ready = items.filter(i => i.status === 'pronto').length;
+  const failed = items.filter(i => i.status === 'erro').length;
+  const redo = items.some(i => i.status === 'erro' || (i.status === 'pronto' && i.key !== key));
+  $('zip').disabled = busy || !ready;
+  $('convert').disabled = busy || !redo;
+  $('clear').disabled = busy || !items.length;
+  items.forEach(updateRow);
+
+  let msg = 'Nenhum arquivo ainda.';
+  if (items.length) {
+    msg = `${plural(items.length, 'arquivo', 'arquivos')} · ${plural(ready, 'pronto', 'prontos')}`;
+    if (failed) msg += ` · ${plural(failed, 'com erro', 'com erro')}`;
+    if (busy) msg += ' · convertendo…';
+  }
+  $('status').textContent = msg + (note ? ` — ${note}` : '');
+}
+
+/* ---------- .zip (sem compressão: WAV quase não comprime) ---------- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+const crcCache = new WeakMap(); // blob -> crc
+async function makeZip(list) {
+  const enc = new TextEncoder(), now = new Date(), used = new Set();
+  const time = now.getHours() << 11 | now.getMinutes() << 5 | now.getSeconds() >> 1;
+  const date = (now.getFullYear() - 1980) << 9 | (now.getMonth() + 1) << 5 | now.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const { base, blob } of list) {
+    let fileName = base + '.wav';
+    for (let n = 2; used.has(fileName.toLowerCase()); n++) fileName = `${base} (${n}).wav`;
+    used.add(fileName.toLowerCase());
+    const name = enc.encode(fileName), size = blob.size;
+    if (!crcCache.has(blob)) crcCache.set(blob, crc32(new Uint8Array(await blob.arrayBuffer())));
+    const crc = crcCache.get(blob);
+    await tick();
+
+    const h = new DataView(new ArrayBuffer(30));
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); // 0x0800 = nome em UTF-8
+    h.setUint16(10, time, true); h.setUint16(12, date, true); h.setUint32(14, crc, true);
+    h.setUint32(18, size, true); h.setUint32(22, size, true); h.setUint16(26, name.length, true);
+    parts.push(h, name, blob);
+
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+    c.setUint16(12, time, true); c.setUint16(14, date, true); c.setUint32(16, crc, true);
+    c.setUint32(20, size, true); c.setUint32(24, size, true); c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+    central.push(c, name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((s, x) => s + x.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, list.length, true); end.setUint16(10, list.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end], { type: 'application/zip' });
+}
+
+$('zip').onclick = async () => {
+  // Cópia fixa: tirar um item da lista no meio não atrapalha o .zip.
+  const list = items.filter(i => i.status === 'pronto').map(i => ({ base: i.file.name.replace(/\.mp3$/i, ''), blob: i.blob }));
+  const total = list.reduce((s, x) => s + x.blob.size + 200, 0);
+  if (total > 0xFFFFFFFF || list.length > 65535) {
+    note = 'Os arquivos passam de 4 GB juntos, grande demais para um .zip. Baixe um por um.';
+    return refresh();
+  }
+  busy = true;
+  note = 'Preparando o .zip…';
+  refresh();
+  try {
+    const url = URL.createObjectURL(await makeZip(list));
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'wav-convertidos.zip' });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    note = '';
+  } catch (e) {
+    console.error(e);
+    note = 'Não consegui montar o .zip: ' + friendlyError(e);
+  } finally {
+    busy = false;
+    refresh();
+    convertAll(); // arquivos que chegaram enquanto o .zip era montado
+  }
+};
+
+/* ---------- botões e arrastar ---------- */
+$('convert').onclick = () => {
+  const key = optionsKey();
+  for (const it of items) if (it.status === 'erro' || (it.status === 'pronto' && it.key !== key)) it.status = 'fila';
+  note = '';
+  convertAll();
+};
+$('clear').onclick = () => {
+  items.forEach(clearOutput);
+  items.length = 0;
+  $('list').replaceChildren();
+  note = '';
+  refresh();
+};
+
+const drop = $('drop'), picker = $('file');
+drop.onclick = () => picker.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); } };
+picker.onchange = () => { addFiles([...picker.files]); picker.value = ''; };
+
+const hasFiles = e => [...((e.dataTransfer && e.dataTransfer.types) || [])].includes('Files');
+for (const type of ['dragenter', 'dragover']) window.addEventListener(type, e => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  drop.classList.add('over');
+});
+window.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]);
+});
+</script>
+</body>
+</html>
