@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Conversor</title>
+<script type="importmap">{"imports": {"wasm-feature-detect": "https://cdn.jsdelivr.net/npm/wasm-feature-detect@1.9.0/dist/esm/index.js"}}</script>
 <style>
 :root{--bg:#080d18;--card:#111a2d;--card2:#0c1424;--line:#26324b;--text:#edf3ff;--muted:#94a1bd;--blue:#6ea8fe;--green:#4fd17b;--red:#ff6868;--yellow:#ffd166}
 *{box-sizing:border-box}
@@ -37,6 +38,7 @@ input[type=url]{flex:1 1 280px;min-width:0;padding:10px}
 .bar{height:100%;width:0;background:var(--blue);transition:width .15s}
 .bar.done{background:var(--green)}.bar.fail{background:var(--red)}
 audio{width:100%;margin-top:10px;height:38px}
+video{width:100%;max-height:360px;margin-top:10px;border-radius:10px;background:#000}
 .tabs{display:flex;gap:8px;flex-wrap:wrap}
 .tab{border:1px solid var(--line);background:var(--card2);color:var(--muted);border-radius:10px;padding:10px 16px;font:inherit;font-weight:650;cursor:pointer}
 .tab:hover{color:var(--text)}.tab[aria-selected=true]{background:var(--blue);border-color:var(--blue);color:#07101f}
@@ -48,6 +50,8 @@ input[type=color]{width:100%;height:40px;padding:3px;background:#070c16;border:1
 .frame{aspect-ratio:4/3;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#070c16}
 .frame img{max-width:100%;max-height:100%;display:block}
 .checker{background:repeating-conic-gradient(#c9ced8 0 25%,#fff 0 50%) 0 0/18px 18px}
+.thumb{display:block;max-width:100%;max-height:240px;margin-top:10px;border-radius:8px;border:1px solid var(--line)}
+.render-host{position:fixed;left:-100000px;top:0;background:#fff;color:#000}
 .hidden{display:none!important}
 @media(max-width:700px){.wrap{padding:13px}.hero h1{font-size:23px}.opts{grid-template-columns:1fr}.pics{gap:6px}}
 </style>
@@ -60,17 +64,46 @@ input[type=color]{width:100%;height:40px;padding:3px;background:#070c16;border:1
 </div>
 
 <div class="tabs" role="tablist">
-<button class="tab" role="tab" data-tab="audio" aria-selected="true" aria-controls="panel-audio">🎵 Áudio para WAV</button>
-<button class="tab" role="tab" data-tab="img" aria-selected="false" aria-controls="panel-img">🖼️ Remover fundo</button>
+<button class="tab" role="tab" data-tab="audio" aria-selected="true" aria-controls="panel-audio">🎵 Áudio e vídeo</button>
+<button class="tab" role="tab" data-tab="imgconv" aria-selected="false" aria-controls="panel-imgconv">🖼️ Imagens</button>
+<button class="tab" role="tab" data-tab="img" aria-selected="false" aria-controls="panel-img">✂️ Remover fundo</button>
+<button class="tab" role="tab" data-tab="docs" aria-selected="false" aria-controls="panel-docs">📄 Documentos</button>
 </div>
 
 <section id="panel-audio" role="tabpanel">
-<p class="intro">Transforma MP3 e vídeos (como o MP4 baixado do YouTube Studio) em áudio WAV. Funciona até sem internet.</p>
+<p class="intro">Converte música e vídeo entre os formatos mais usados e tira o som de vídeos (como o MP4 baixado do YouTube Studio).</p>
 
 <div class="card">
-<h3>1. Formato do WAV</h3>
+<h3>1. Formato de saída</h3>
 <div class="opts">
-<label>Taxa de amostragem
+<label>Converter para
+<select id="out">
+<optgroup label="Áudio">
+<option value="wav">WAV</option>
+<option value="mp3">MP3</option>
+<option value="flac">FLAC</option>
+<option value="aac">AAC</option>
+<option value="m4a">M4A (AAC)</option>
+<option value="ogg">OGG (Vorbis)</option>
+<option value="opus">OPUS</option>
+<option value="wma">WMA</option>
+<option value="aiff">AIFF</option>
+<option value="alac">ALAC (.m4a sem perdas)</option>
+</optgroup>
+<optgroup label="Vídeo">
+<option value="mp4">MP4</option>
+<option value="mov">MOV</option>
+<option value="avi">AVI</option>
+<option value="mkv">MKV</option>
+<option value="wmv">WMV</option>
+<option value="webm">WEBM</option>
+<option value="flv">FLV</option>
+<option value="m4v">M4V</option>
+<option value="3gp">3GP</option>
+<option value="mpg">MPEG</option>
+</optgroup>
+</select></label>
+<label data-for="audio">Taxa de amostragem
 <select id="rate">
 <option value="orig">Igual ao original (recomendado)</option>
 <option value="48000">48.000 Hz</option>
@@ -81,23 +114,44 @@ input[type=color]{width:100%;height:40px;padding:3px;background:#070c16;border:1
 <option value="11025">11.025 Hz</option>
 <option value="8000">8.000 Hz (telefone)</option>
 </select></label>
-<label>Canais
+<label data-for="audio">Canais
 <select id="channels">
 <option value="orig">Igual ao original</option>
 <option value="1">Mono</option>
 <option value="2">Estéreo</option>
 </select></label>
-<label>Resolução
+<label data-for="lossless">Resolução
 <select id="format">
 <option value="pcm16">16 bits (padrão, abre em tudo)</option>
 <option value="pcm24">24 bits</option>
-<option value="float32">32 bits float</option>
+<option value="float32">32 bits float (só WAV; nos outros vira 24)</option>
+</select></label>
+<label data-for="lossy">Qualidade do áudio
+<select id="abr">
+<option value="128">128 kbps (arquivo menor)</option>
+<option value="192" selected>192 kbps (padrão)</option>
+<option value="256">256 kbps</option>
+<option value="320">320 kbps (máxima)</option>
+</select></label>
+<label data-for="video">Qualidade do vídeo
+<select id="vq">
+<option value="keep">Manter (mais rápido, quando dá)</option>
+<option value="alta">Alta</option>
+<option value="normal">Normal</option>
+<option value="leve">Leve (arquivo menor)</option>
+</select></label>
+<label data-for="video">Tamanho do vídeo
+<select id="vres">
+<option value="orig">Original</option>
+<option value="1080">Até 1080p</option>
+<option value="720">Até 720p</option>
+<option value="480">Até 480p</option>
 </select></label>
 </div>
 <p class="hint">
-Na dúvida, deixe como está. Centrais telefônicas e URAs costumam pedir <b>8.000 Hz, mono, 16 bits</b>.
-Converter para WAV não melhora o som: o arquivo só fica num formato sem compressão, maior (cerca de 10 MB por minuto em estéreo) e aceito por mais programas.
-Vídeos com som 5.1 viram estéreo.
+Na dúvida, deixe como está. WAV é feito pelo próprio navegador, rápido e até sem internet. Os outros formatos usam o FFmpeg,
+que a página baixa na primeira vez (cerca de 32 MB) e guarda no navegador. Converter vídeo demora mais: pode levar alguns minutos por minuto de vídeo.
+Centrais telefônicas e URAs costumam pedir <b>WAV, 8.000 Hz, mono, 16 bits</b>. Converter não melhora a qualidade do original; som 5.1 vira estéreo.
 </p>
 </div>
 
@@ -105,9 +159,9 @@ Vídeos com som 5.1 viram estéreo.
 <h3>2. Escolha os arquivos</h3>
 <div class="drop" id="drop" role="button" tabindex="0">
 <b>📂 Clique para escolher os arquivos</b>
-<span class="hint">ou arraste para esta página: MP3, vídeos (MP4, WebM, MOV…) e outros áudios (M4A, OGG, FLAC, WAV…). Pode ser vários de uma vez; a conversão começa sozinha.</span>
+<span class="hint">ou arraste para esta página: músicas (MP3, WAV, FLAC, AAC, M4A, OGG, OPUS, WMA, AIFF…) e vídeos (MP4, MOV, AVI, MKV, WMV, WEBM, FLV, M4V, 3GP, MPEG…). Pode ser vários de uma vez; a conversão começa sozinha.</span>
 </div>
-<input id="file" type="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.m4v,.mov,.webm,.mkv,.ogg,.oga,.opus,.aac,.flac,.wav,.3gp" multiple hidden>
+<input id="file" type="file" accept="audio/*,video/*,.mp3,.wav,.flac,.aac,.m4a,.ogg,.oga,.opus,.wma,.aif,.aiff,.mp4,.mov,.avi,.mkv,.wmv,.webm,.flv,.m4v,.3gp,.mpg,.mpeg,.ts,.mts,.vob,.amr,.ac3" multiple hidden>
 <div class="row link-row">
 <input id="link" type="url" placeholder="Ou cole o link de um arquivo" autocomplete="off" aria-label="Link do arquivo">
 <button class="btn primary" id="addLink">🔗 Adicionar link</button>
@@ -118,7 +172,7 @@ Links do YouTube, Instagram, TikTok e outras plataformas não funcionam: elas n�
 </div>
 
 <div class="card">
-<h3>3. Baixar os WAV</h3>
+<h3>3. Baixar</h3>
 <div class="row">
 <button class="btn green" id="zip" disabled>⬇️ Baixar todos (.zip)</button>
 <button class="btn primary" id="convert" disabled>🔄 Converter de novo com as opções atuais</button>
@@ -126,6 +180,66 @@ Links do YouTube, Instagram, TikTok e outras plataformas não funcionam: elas n�
 </div>
 <div id="status" class="status">Nenhum arquivo ainda.</div>
 <div id="list"></div>
+</div>
+</section>
+
+<section id="panel-imgconv" role="tabpanel" hidden>
+<p class="intro">Converte imagens entre os formatos mais usados: JPG, PNG, WEBP, AVIF, GIF, BMP, TIFF, ICO, SVG e HEIC (fotos do iPhone).</p>
+<div class="card">
+<h3>1. Formato de saída</h3>
+<div class="opts">
+<label>Converter para
+<select id="icOut">
+<option value="jpg">JPG</option>
+<option value="png">PNG</option>
+<option value="webp">WEBP</option>
+<option value="avif">AVIF</option>
+<option value="gif">GIF</option>
+<option value="bmp">BMP</option>
+<option value="tiff">TIFF</option>
+<option value="ico">ICO (ícone)</option>
+<option value="svg">SVG</option>
+</select></label>
+<label id="icQLabel">Qualidade
+<select id="icQ">
+<option value="0.95">Máxima</option>
+<option value="0.85" selected>Alta (recomendada)</option>
+<option value="0.7">Média (arquivo menor)</option>
+<option value="0.5">Baixa</option>
+</select></label>
+<label>Tamanho
+<select id="icSize">
+<option value="0">Original</option>
+<option value="3840">Até 3840 px (4K)</option>
+<option value="1920">Até 1920 px (Full HD)</option>
+<option value="1280">Até 1280 px</option>
+<option value="800">Até 800 px</option>
+<option value="512">Até 512 px</option>
+</select></label>
+</div>
+<p class="hint">JPG e BMP não têm transparência: as partes transparentes ficam brancas. ICO gera um ícone com vários tamanhos (16 a 256 px).
+SVG guarda a imagem dentro de um arquivo SVG, mas não a transforma em desenho vetorial. HEIC (fotos do iPhone) pode ser convertido para os outros formatos,
+mas não dá para gerar HEIC no navegador. De GIF animado, só o primeiro quadro é convertido. HEIC, TIFF, AVIF e GIF baixam uma ferramenta pequena na primeira vez.</p>
+</div>
+
+<div class="card">
+<h3>2. Escolha as imagens</h3>
+<div class="drop" id="icDrop" role="button" tabindex="0">
+<b>🖼️ Clique para escolher as imagens</b>
+<span class="hint">ou arraste para esta página, ou cole com Ctrl+V. Pode ser várias de uma vez; a conversão começa sozinha.</span>
+</div>
+<input id="icFile" type="file" accept="image/*,.heic,.heif,.tif,.tiff,.ico,.svg,.avif,.bmp,.jfif" multiple hidden>
+</div>
+
+<div class="card">
+<h3>3. Baixar</h3>
+<div class="row">
+<button class="btn green" id="icZip" disabled>⬇️ Baixar todas (.zip)</button>
+<button class="btn primary" id="icRedo" disabled>🔄 Converter de novo com as opções atuais</button>
+<button class="btn danger" id="icClear" disabled>Limpar lista</button>
+</div>
+<div id="icStatus" class="status">Nenhuma imagem ainda.</div>
+<div id="icList"></div>
 </div>
 </section>
 
@@ -167,11 +281,67 @@ O resultado sai em PNG, no mesmo tamanho da foto original. Funciona melhor quand
 <div id="imgList"></div>
 </div>
 </section>
+
+<section id="panel-docs" role="tabpanel" hidden>
+<p class="intro">Converte documentos: Word, PDF, Excel e imagens.</p>
+<div class="card">
+<h3>1. O que converter</h3>
+<div class="opts">
+<label>Conversão
+<select id="docMode">
+<option value="docx-pdf">Word (DOCX) → PDF</option>
+<option value="pdf-docx">PDF → Word (DOCX)</option>
+<option value="xlsx-pdf">Excel (XLSX, XLS, ODS, CSV) → PDF</option>
+<option value="xlsx-csv">Excel ↔ CSV</option>
+<option value="img-pdf">Imagens → PDF</option>
+<option value="pdf-img">PDF → Imagens</option>
+</select></label>
+<label data-doc="img-pdf">Página
+<select id="docPage">
+<option value="a4">A4 (imagem ajustada)</option>
+<option value="fit">Do tamanho da imagem</option>
+</select></label>
+<label data-doc="pdf-img">Formato das imagens
+<select id="docImg">
+<option value="jpg">JPG</option>
+<option value="png">PNG</option>
+</select></label>
+<label data-doc="pdf-img">Resolução
+<select id="docDpi">
+<option value="100">Baixa (100 dpi)</option>
+<option value="150" selected>Normal (150 dpi)</option>
+<option value="300">Alta (300 dpi, para imprimir)</option>
+</select></label>
+</div>
+<p class="hint" id="docHint"></p>
+<p class="hint">Tudo é feito no seu navegador; na primeira vez de cada conversão a página baixa as ferramentas necessárias (de 1 a 5 MB).</p>
+</div>
+
+<div class="card">
+<h3>2. Escolha os arquivos</h3>
+<div class="drop" id="docDrop" role="button" tabindex="0">
+<b>📄 Clique para escolher os arquivos</b>
+<span class="hint">ou arraste para esta página. Se um arquivo não combinar com a conversão escolhida, a página usa a conversão certa para ele.</span>
+</div>
+<input id="docFile" type="file" accept=".docx,.pdf,.xlsx,.xlsm,.xls,.ods,.csv,image/*,.heic,.heif,.tif,.tiff" multiple hidden>
+</div>
+
+<div class="card">
+<h3>3. Baixar</h3>
+<div class="row">
+<button class="btn green" id="docZip" disabled>⬇️ Baixar todos (.zip)</button>
+<button class="btn primary" id="docRedo" disabled>🔄 Converter de novo com as opções atuais</button>
+<button class="btn danger" id="docClear" disabled>Limpar lista</button>
+</div>
+<div id="docStatus" class="status">Nenhum arquivo ainda.</div>
+<div id="docList"></div>
+</div>
+</section>
 </div>
 
 <script>
 const $ = id => document.getElementById(id);
-const OPT_IDS = ['rate', 'channels', 'format'];
+const OPT_IDS = ['out', 'rate', 'channels', 'format', 'abr', 'vq', 'vres'];
 const OPT_KEY = 'conversorMp3Wav.opcoes';
 const FORMAT_LABEL = { pcm16: '16 bits', pcm24: '24 bits', float32: '32 bits float' };
 const items = [];
@@ -182,10 +352,25 @@ try {
   const saved = JSON.parse(localStorage.getItem(OPT_KEY) || '{}');
   for (const id of OPT_IDS) if ([...$(id).options].some(o => o.value === saved[id])) $(id).value = saved[id];
 } catch {}
-const options = () => ({ rate: $('rate').value, channels: $('channels').value, format: $('format').value });
-const optionsKey = () => JSON.stringify(options());
+const options = () => Object.fromEntries(OPT_IDS.map(id => [id, $(id).value]));
+const outKind = out => VIDEO_OUT[out] ? 'video' : AUDIO_OUT[out].bits ? 'lossless' : 'lossy';
+// Só as opções que valem para o formato escolhido: mudar as outras não pede para converter de novo.
+function relevantOptions(o) {
+  const kind = outKind(o.out);
+  if (kind === 'video') return { out: o.out, vq: o.vq, vres: o.vres };
+  return { out: o.out, rate: o.rate, channels: o.channels, ...(kind === 'lossless' ? { format: o.format } : { abr: o.abr }) };
+}
+const optionsKey = () => JSON.stringify(relevantOptions(options()));
+function showOptionFields() {
+  const kind = outKind($('out').value);
+  for (const label of document.querySelectorAll('#panel-audio [data-for]')) {
+    const f = label.dataset.for;
+    label.classList.toggle('hidden', !(f === kind || (f === 'audio' && kind !== 'video')));
+  }
+}
 for (const id of OPT_IDS) $(id).addEventListener('change', () => {
-  try { localStorage.setItem(OPT_KEY, optionsKey()); } catch {}
+  try { localStorage.setItem(OPT_KEY, JSON.stringify(options())); } catch {}
+  showOptionFields();
   refresh();
 });
 
@@ -356,7 +541,7 @@ async function decode(bytes, rate) {
     });
   } catch (e) {
     if (e instanceof RangeError) throw e;
-    throw userError('Não consegui ler o som deste arquivo. Ele pode estar corrompido, não ter áudio ou estar num formato que este navegador não abre (tente o Chrome ou o Edge).');
+    throw Object.assign(userError('Não consegui ler o som deste arquivo. Ele pode estar corrompido, não ter áudio ou estar num formato que este navegador não abre (tente o Chrome ou o Edge).'), { decodeFailed: true });
   }
 }
 
@@ -432,7 +617,7 @@ async function encodeWav(chans, rate, format, onProgress) {
 }
 
 /* ---------- fila de conversão ---------- */
-const MEDIA_EXT = /\.(mp3|mp4|m4a|m4v|mov|webm|mkv|ogg|oga|opus|aac|flac|wav|3gp)$/i;
+const MEDIA_EXT = /\.(mp3|wav|flac|aac|m4a|ogg|oga|opus|wma|aif|aiff|aifc|mp4|mov|avi|mkv|wmv|webm|flv|m4v|3gp|3g2|mpg|mpeg|ts|mts|m2ts|vob|asf|amr|ac3|mka|ogv)$/i;
 const baseName = name => name.replace(/\.[^.]*$/, '');
 function addFiles(files) {
   const ignored = [];
@@ -557,11 +742,29 @@ async function convertAll() {
 }
 
 async function convertItem(it) {
-  const opt = options(), key = JSON.stringify(opt);
+  const opt = options(), key = optionsKey();
   Object.assign(it, { status: 'convertendo', phase: 'Lendo o arquivo…', progress: 0, error: '' });
   updateRow(it);
   try {
     if (!it.file) await download(it);
+    let result = null;
+    if (opt.out === 'wav') {
+      try { result = await toWav(it, opt); } catch (e) { if (!e.decodeFailed) throw e; } // o navegador não lê: tenta o FFmpeg
+    }
+    if (!result) result = await convertWithFFmpeg(it, opt);
+    clearOutput(it);
+    Object.assign(it, { status: 'pronto', key, blob: result.blob, url: URL.createObjectURL(result.blob), info: result.info,
+      outExt: result.ext, outLabel: OUT_LABEL(opt.out), isVideo: !!VIDEO_OUT[opt.out], previewFailed: false });
+  } catch (e) {
+    if (!(e && e.forUser)) console.error(e);
+    clearOutput(it);
+    Object.assign(it, { status: 'erro', error: friendlyError(e) });
+  }
+  updateRow(it);
+}
+
+// WAV direto pelo Web Audio do navegador: rápido e sem baixar nada.
+async function toWav(it, opt) {
     Object.assign(it, { phase: 'Lendo o arquivo…', progress: 0 });
     updateRow(it);
     const bytes = await it.file.arrayBuffer();
@@ -574,18 +777,199 @@ async function convertItem(it) {
     const chans = mapChannels(audio, opt.channels);
     it.phase = 'Gerando o WAV…';
     const wav = await encodeWav(chans, rate, opt.format, f => { it.progress = 0.15 + 0.85 * f; updateRow(it); });
-    const blob = new Blob([wav], { type: 'audio/wav' });
-    clearOutput(it);
-    Object.assign(it, {
-      status: 'pronto', key, blob, url: URL.createObjectURL(blob),
-      info: { srcRate, srcCh: audio.numberOfChannels, rate, ch: chans.length, format: opt.format, duration: audio.length / rate }
-    });
-  } catch (e) {
-    if (!(e && e.forUser)) console.error(e);
-    clearOutput(it);
-    Object.assign(it, { status: 'erro', error: friendlyError(e) });
+    return { blob: new Blob([wav], { type: 'audio/wav' }), ext: 'wav',
+      info: { srcRate, srcCh: audio.numberOfChannels, rate, ch: chans.length, format: opt.format, duration: audio.length / rate } };
+}
+
+/* ---------- FFmpeg: os outros formatos de áudio e vídeo ---------- */
+const CDN = 'https://cdn.jsdelivr.net/npm/';
+const FF_BASE = CDN + '@ffmpeg/core@0.12.10/dist/umd/', FF_CACHE = 'ffmpeg-core-0.12.10';
+const PCM = (s16, s24) => ({ pcm16: ['-c:a', s16], pcm24: ['-c:a', s24], float32: ['-c:a', s24] });
+const DEEP = (codec, s16, s32) => ({ pcm16: ['-c:a', codec, '-sample_fmt', s16], pcm24: ['-c:a', codec, '-sample_fmt', s32, '-bits_per_raw_sample', '24'] });
+const AUDIO_OUT = {
+  wav: { ext: 'wav', mime: 'audio/wav', bits: { ...PCM('pcm_s16le', 'pcm_s24le'), float32: ['-c:a', 'pcm_f32le'] } },
+  mp3: { ext: 'mp3', mime: 'audio/mpeg', codec: ['-c:a', 'libmp3lame'] },
+  flac: { ext: 'flac', mime: 'audio/flac', bits: DEEP('flac', 's16', 's32') },
+  aac: { ext: 'aac', mime: 'audio/aac', codec: ['-c:a', 'aac', '-f', 'adts'] },
+  m4a: { ext: 'm4a', mime: 'audio/mp4', codec: ['-c:a', 'aac', '-movflags', '+faststart'] },
+  ogg: { ext: 'ogg', mime: 'audio/ogg', codec: ['-c:a', 'libvorbis'] },
+  opus: { ext: 'opus', mime: 'audio/ogg', codec: ['-c:a', 'libopus'], rates: ['48000', '24000', '16000', '12000', '8000'] },
+  wma: { ext: 'wma', mime: 'audio/x-ms-wma', codec: ['-c:a', 'wmav2'] },
+  aiff: { ext: 'aiff', mime: 'audio/aiff', bits: PCM('pcm_s16be', 'pcm_s24be') },
+  alac: { ext: 'm4a', mime: 'audio/mp4', bits: DEEP('alac', 's16p', 's32p') }
+};
+const MP4ISH = ['-movflags', '+faststart'];
+const VIDEO_OUT = {
+  mp4: { ext: 'mp4', mime: 'video/mp4', v: 'h264', a: 'aac', copy: true, extra: MP4ISH },
+  mov: { ext: 'mov', mime: 'video/quicktime', v: 'h264', a: 'aac', copy: true, extra: MP4ISH },
+  avi: { ext: 'avi', mime: 'video/x-msvideo', v: 'mpeg4', a: 'mp3', extra: [] },
+  mkv: { ext: 'mkv', mime: 'video/x-matroska', v: 'h264', a: 'aac', copy: true, extra: [] },
+  wmv: { ext: 'wmv', mime: 'video/x-ms-wmv', v: 'wmv2', a: 'wma', extra: [] },
+  webm: { ext: 'webm', mime: 'video/webm', v: 'vp8', a: 'vorbis', copy: true, extra: [] },
+  flv: { ext: 'flv', mime: 'video/x-flv', v: 'h264', a: 'aac', extra: [] },
+  m4v: { ext: 'm4v', mime: 'video/x-m4v', v: 'h264', a: 'aac', copy: true, extra: MP4ISH },
+  '3gp': { ext: '3gp', mime: 'video/3gpp', v: 'h264', a: 'aac', extra: ['-profile:v', 'baseline', '-level', '3.0'] },
+  mpg: { ext: 'mpg', mime: 'video/mpeg', v: 'mpeg2', a: 'mp2', extra: [] }
+};
+const OUT_LABEL = out => ({ m4a: 'M4A', alac: 'ALAC', ogg: 'OGG', mpg: 'MPEG' })[out] || out.toUpperCase();
+const COPY_FROM = ['mp4', 'm4v', 'mov', 'mkv', 'webm']; // vídeos que costumam dar para trocar de formato sem recomprimir
+
+// Monta as tentativas de conversão (comando do FFmpeg) para as opções escolhidas.
+function ffmpegPlan(o, inExt) {
+  const a = AUDIO_OUT[o.out];
+  if (a) {
+    const args = ['-vn', '-sn', '-dn', ...(a.bits ? a.bits[o.format] || a.bits.pcm24 : a.codec)];
+    if (o.rate !== 'orig' && (!a.rates || a.rates.includes(o.rate))) args.push('-ar', o.rate);
+    args.push(...(o.channels === 'orig' ? ['-af', 'aformat=channel_layouts=mono|stereo'] : ['-ac', o.channels]));
+    if (!a.bits) args.push('-b:a', o.abr + 'k');
+    const attempts = [{ phase: 'Convertendo…', args }];
+    if (o.out === 'opus') attempts.push({ phase: 'Convertendo (outro codificador)…', args: args.map(x => x === 'libopus' ? 'opus' : x).concat('-strict', '-2') });
+    return { ext: a.ext, mime: a.mime, attempts };
   }
+  const v = VIDEO_OUT[o.out], attempts = [], i = { alta: 0, normal: 1, leve: 2 }[o.vq] ?? 1;
+  if (o.vq === 'keep' && o.vres === 'orig' && v.copy && COPY_FROM.includes(inExt)) {
+    attempts.push({ phase: 'Trocando o formato (sem recomprimir)…', args: ['-map', '0:v:0?', '-map', '0:a:0?', '-c', 'copy', ...v.extra] });
+  }
+  const video = {
+    h264: ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', [20, 23, 28][i], '-pix_fmt', 'yuv420p'],
+    mpeg4: ['-c:v', 'mpeg4', '-vtag', 'XVID', '-q:v', [3, 5, 8][i]],
+    wmv2: ['-c:v', 'wmv2', '-q:v', [3, 5, 8][i]],
+    vp8: ['-c:v', 'libvpx', '-deadline', 'realtime', '-cpu-used', 8, '-crf', [8, 16, 30][i], '-b:v', ['6M', '3M', '1M'][i]],
+    mpeg2: ['-c:v', 'mpeg2video', '-q:v', [3, 5, 8][i], '-pix_fmt', 'yuv420p']
+  }[v.v];
+  const audio = {
+    aac: ['-c:a', 'aac', '-b:a', ['192k', '160k', '96k'][i]],
+    mp3: ['-c:a', 'libmp3lame', '-b:a', ['192k', '160k', '128k'][i]],
+    wma: ['-c:a', 'wmav2', '-b:a', ['192k', '160k', '128k'][i]],
+    vorbis: ['-c:a', 'libvorbis', '-b:a', ['160k', '128k', '96k'][i]],
+    mp2: ['-c:a', 'mp2', '-b:a', ['224k', '192k', '128k'][i]]
+  }[v.a];
+  // Largura e altura pares (exigência dos codificadores); "Até 720p" só diminui, nunca aumenta.
+  const scale = o.vres === 'orig' ? 'scale=trunc(iw/2)*2:trunc(ih/2)*2' : `scale=-2:'trunc(min(${o.vres},ih)/2)*2'`;
+  attempts.push({ phase: 'Convertendo o vídeo (pode demorar)…', args: ['-sn', '-dn', ...video.map(String), '-vf', scale, ...audio, ...v.extra] });
+  return { ext: v.ext, mime: v.mime, attempts };
+}
+
+// O FFmpeg roda num "worker" (em paralelo) para a página não travar. O código dele vai junto no
+// próprio worker e o .wasm é passado por mensagem: páginas abertas do computador (file://) não
+// deixam o worker carregar outros arquivos.
+const FF_WORKER = `
+let core, logs = [];
+self.onmessage = async ({ data: { id, type, payload } }) => {
+  try {
+    if (type === 'load') {
+      core = await createFFmpegCore({ wasmBinary: new Uint8Array(payload.wasm) });
+      core.setLogger(({ message }) => { logs.push(message); if (logs.length > 400) logs.shift(); });
+      return self.postMessage({ id, type: 'done' });
+    }
+    logs = [];
+    core.FS.writeFile(payload.inName, new Uint8Array(payload.input));
+    core.setProgress(({ progress }) => self.postMessage({ id, type: 'progress', progress }));
+    core.exec(...payload.args);
+    const ret = core.ret;
+    core.reset();
+    let out = null;
+    if (ret === 0) try { out = core.FS.readFile(payload.outName); } catch {}
+    for (const f of [payload.inName, payload.outName]) try { core.FS.unlink(f); } catch {}
+    const buf = out && (out.byteOffset === 0 && out.byteLength === out.buffer.byteLength ? out.buffer : out.slice().buffer);
+    self.postMessage({ id, type: 'done', ret, logs, out: buf }, buf ? [buf] : []);
+  } catch (e) {
+    self.postMessage({ id, type: 'error', error: String((e && e.message) || e), logs });
+  }
+};`;
+
+let ffEngine = null;
+function loadFFmpeg(onProgress) {
+  ffEngine = ffEngine || (async () => {
+    const [js, wasm] = await Promise.all([
+      fetchCached(FF_BASE + 'ffmpeg-core.js', FF_CACHE).then(b => b.text()),
+      fetchCached(FF_BASE + 'ffmpeg-core.wasm', FF_CACHE, onProgress).then(b => b.arrayBuffer())
+    ]);
+    const worker = new Worker(URL.createObjectURL(new Blob([js, '\n;', FF_WORKER], { type: 'text/javascript' })));
+    const jobs = new Map();
+    let seq = 0;
+    const fail = err => { for (const job of jobs.values()) job.fail(err); jobs.clear(); worker.terminate(); ffEngine = null; };
+    worker.onerror = e => fail(new Error(e.message || 'O FFmpeg parou de responder.'));
+    worker.onmessage = ({ data }) => {
+      const job = jobs.get(data.id);
+      if (!job) return;
+      if (data.type === 'progress') return job.onProgress && job.onProgress(data.progress);
+      jobs.delete(data.id);
+      if (data.type === 'error') { job.fail(Object.assign(new Error(data.error), { logs: data.logs })); fail(new Error('reiniciar')); } // depois de um erro grave, recomeça do zero
+      else job.ok(data);
+    };
+    const send = (type, payload, transfer = [], onProgress) => new Promise((ok, no) => {
+      const id = ++seq;
+      jobs.set(id, { ok, fail: no, onProgress });
+      worker.postMessage({ id, type, payload }, transfer);
+    });
+    await send('load', { wasm }, [wasm]);
+    return send;
+  })().catch(e => { ffEngine = null; throw e; });
+  return ffEngine;
+}
+
+async function convertWithFFmpeg(it, opt) {
+  const showSoon = () => { if (Date.now() - (it.shown || 0) > 150) { it.shown = Date.now(); updateRow(it); } };
+  Object.assign(it, { phase: 'Carregando o FFmpeg…', progress: 0 });
   updateRow(it);
+  const send = await loadFFmpeg((got, total) => {
+    Object.assign(it, { phase: `Baixando o FFmpeg (só na primeira vez)… ${fmtSize(got)}${total ? ' de ' + fmtSize(total) : ''}`, progress: total ? got / total : 0 });
+    showSoon();
+  });
+  const inExt = ((/\.([a-z0-9]{1,5})$/i.exec(it.name) || [])[1] || 'bin').toLowerCase();
+  const plan = ffmpegPlan(opt, inExt), inName = 'entrada.' + inExt, outName = 'saida.' + plan.ext;
+  let logs = [];
+  for (const attempt of plan.attempts) {
+    Object.assign(it, { phase: attempt.phase, progress: 0 });
+    updateRow(it);
+    const input = await it.file.arrayBuffer();
+    let res;
+    try {
+      res = await send('exec', { input, inName, outName, args: ['-hide_banner', '-nostdin', '-y', '-i', inName, ...attempt.args, outName] }, [input],
+        p => { it.progress = Math.max(0, Math.min(1, p)); showSoon(); });
+    } catch (e) {
+      logs = e.logs || [];
+      if (/out of memory|cannot enlarge|allocation failed/i.test(e.message)) throw new RangeError(e.message);
+      continue;
+    }
+    if (res.ret === 0 && res.out && res.out.byteLength) {
+      const d = /Duration: (\d+):(\d+):([\d.]+)/.exec(res.logs.join('\n'));
+      return { blob: new Blob([res.out], { type: plan.mime }), ext: plan.ext, info: { duration: d ? d[1] * 3600 + d[2] * 60 + +d[3] : 0 } };
+    }
+    logs = res.logs;
+  }
+  const log = logs.join('\n');
+  console.warn(log);
+  if (/does not contain any stream|matches no streams/i.test(log)) {
+    throw userError(VIDEO_OUT[opt.out] ? 'Este arquivo não tem vídeo nem som para converter.' : 'Este arquivo não tem som para converter.');
+  }
+  throw userError('Não consegui converter este arquivo. Ele pode estar corrompido ou usar um formato raro.');
+}
+
+// Baixa um arquivo grande (como o FFmpeg) mostrando o progresso e guarda no cache do navegador.
+async function fetchCached(url, cacheName, onProgress) {
+  let cache = null;
+  try {
+    cache = await caches.open(cacheName);
+    const hit = await cache.match(url);
+    if (hit) return await hit.blob();
+  } catch {}
+  let res;
+  try { res = await plainFetch(url); } catch { throw userError('Não consegui baixar uma ferramenta necessária. Confira a internet e tente de novo.'); }
+  if (!res.ok) throw userError(`Não consegui baixar uma ferramenta necessária (erro ${res.status}). Tente de novo mais tarde.`);
+  const total = +res.headers.get('content-length') || 0, reader = res.body.getReader(), parts = [];
+  let got = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    got += value.length;
+    if (onProgress) onProgress(got, total);
+  }
+  const blob = new Blob(parts, { type: res.headers.get('content-type') || '' });
+  if (cache) cache.put(url, new Response(blob, { headers: { 'Content-Type': blob.type } })).catch(() => {});
+  return blob;
 }
 
 function clearOutput(it) {
@@ -598,10 +982,12 @@ function buildRow(it) {
   const el = document.createElement('div');
   el.className = 'item';
   el.innerHTML = `<div class="top"><div class="info"><div class="name"></div><div class="meta"></div><div class="state"></div></div>
-<div class="row"><a class="btn green dl hidden">⬇️ Baixar WAV</a><button class="btn rm" title="Tirar da lista">✕</button></div></div>
-<div class="progress"><div class="bar"></div></div><audio controls preload="none" class="hidden"></audio>`;
+<div class="row"><a class="btn green dl hidden">⬇️ Baixar</a><button class="btn rm" title="Tirar da lista">✕</button></div></div>
+<div class="progress"><div class="bar"></div></div><audio controls preload="none" class="hidden"></audio><video controls preload="metadata" class="hidden"></video>`;
   const q = s => el.querySelector(s);
-  it.row = { el, name: q('.name'), meta: q('.meta'), state: q('.state'), dl: q('.dl'), rm: q('.rm'), bar: q('.bar'), audio: q('audio') };
+  it.row = { el, name: q('.name'), meta: q('.meta'), state: q('.state'), dl: q('.dl'), rm: q('.rm'), bar: q('.bar'), audio: q('audio'), video: q('video') };
+  // Formatos que o navegador não toca (WMA, AVI…) ficam sem prévia, só com o botão de baixar.
+  for (const media of [it.row.audio, it.row.video]) media.onerror = () => { if (media.getAttribute('src')) { it.previewFailed = true; media.classList.add('hidden'); } };
   it.row.rm.onclick = () => {
     clearOutput(it);
     el.remove();
@@ -617,7 +1003,7 @@ function updateRow(it) {
   const ext = /\.([^.]+)$/.exec(it.name);
   let meta = it.file ? `${ext ? ext[1].toUpperCase() : 'Arquivo'} · ${fmtSize(it.file.size)}` : 'Link';
   if (it.link) meta += ` · de ${new URL(it.link).hostname.replace(/^www\./, '')}`;
-  if (inf) meta += ` · ${inf.srcRate ? fmtRate(inf.srcRate) : 'taxa original não detectada'} · ${chName(inf.srcCh)}`;
+  if (inf && inf.srcCh) meta += ` · ${inf.srcRate ? fmtRate(inf.srcRate) : 'taxa original não detectada'} · ${chName(inf.srcCh)}`;
   r.meta.textContent = meta;
 
   const pct = Math.round(it.progress * 100);
@@ -626,24 +1012,28 @@ function updateRow(it) {
   if (it.status === 'erro') { r.state.textContent = '❌ ' + it.error; r.state.className = 'state err'; }
   if (ready) {
     const stale = it.key !== optionsKey();
-    r.state.textContent = `✅ WAV pronto: ${fmtSize(it.blob.size)} · ${fmtTime(inf.duration)} · ${fmtRate(inf.rate)} · ${chName(inf.ch)} · ${FORMAT_LABEL[inf.format]}`
+    const details = inf.rate ? [fmtTime(inf.duration), fmtRate(inf.rate), chName(inf.ch), FORMAT_LABEL[inf.format]] : [inf.duration && fmtTime(inf.duration)];
+    r.state.textContent = `✅ ${it.outLabel} pronto: ${[fmtSize(it.blob.size), ...details].filter(Boolean).join(' · ')}`
       + (stale ? ' — ⚠️ as opções mudaram; clique em “Converter de novo” para refazer' : '');
     r.state.className = 'state ' + (stale ? 'warn' : 'ok');
   }
 
   r.bar.style.width = (ready || it.status === 'erro' ? 100 : pct) + '%';
   r.bar.className = 'bar' + (ready ? ' done' : it.status === 'erro' ? ' fail' : '');
+  const media = it.isVideo ? r.video : r.audio, other = it.isVideo ? r.audio : r.video;
   r.dl.classList.toggle('hidden', !ready);
-  r.audio.classList.toggle('hidden', !ready);
+  media.classList.toggle('hidden', !ready || it.previewFailed);
+  other.classList.add('hidden');
   if (ready && r.dl.getAttribute('href') !== it.url) {
     r.dl.href = it.url;
-    r.dl.download = baseName(it.name) + '.wav';
-    r.audio.src = it.url;
+    r.dl.download = baseName(it.name) + '.' + it.outExt;
+    r.dl.textContent = `⬇️ Baixar ${it.outLabel}`;
+    for (const m of [r.audio, r.video]) if (m.hasAttribute('src')) { m.removeAttribute('src'); m.load(); }
+    media.src = it.url;
   }
   if (!ready && r.dl.hasAttribute('href')) {
     r.dl.removeAttribute('href');
-    r.audio.removeAttribute('src');
-    r.audio.load();
+    for (const m of [r.audio, r.video]) { m.removeAttribute('src'); m.load(); }
   }
   r.rm.disabled = it.status === 'convertendo';
 }
@@ -768,7 +1158,7 @@ function saveBlob(blob, fileName) {
 
 $('zip').onclick = async () => {
   // Cópia fixa: tirar um item da lista no meio não atrapalha o .zip.
-  const list = items.filter(i => i.status === 'pronto').map(i => ({ name: baseName(i.name) + '.wav', blob: i.blob }));
+  const list = items.filter(i => i.status === 'pronto').map(i => ({ name: baseName(i.name) + '.' + i.outExt, blob: i.blob }));
   busy = true;
   note = 'Preparando o .zip…';
   refresh();
@@ -778,7 +1168,7 @@ $('zip').onclick = async () => {
       const pct = Math.floor(f * 100);
       if (pct !== shown) { shown = pct; note = `Preparando o .zip… ${pct}%`; refresh(); }
     });
-    saveBlob(zip, 'wav-convertidos.zip');
+    saveBlob(zip, 'convertidos.zip');
     note = '';
   } catch (e) {
     console.error(e);
@@ -820,31 +1210,32 @@ const TAB_KEY = 'conversor.aba';
 let activeTab = 'audio';
 function showTab(name) {
   activeTab = name;
-  for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', b.dataset.tab === name);
-  $('panel-audio').hidden = name !== 'audio';
-  $('panel-img').hidden = name !== 'img';
+  for (const b of document.querySelectorAll('.tab')) {
+    b.setAttribute('aria-selected', b.dataset.tab === name);
+    $('panel-' + b.dataset.tab).hidden = b.dataset.tab !== name;
+  }
   try { localStorage.setItem(TAB_KEY, name); } catch {}
 }
 for (const b of document.querySelectorAll('.tab')) b.onclick = () => showTab(b.dataset.tab);
-try { if (localStorage.getItem(TAB_KEY) === 'img') showTab('img'); } catch {}
+try { const saved = localStorage.getItem(TAB_KEY); if (saved && saved !== 'audio' && $('panel-' + saved)) showTab(saved); } catch {}
 
 // Arquivos ou links (arrastados de outra aba) podem ser soltos em qualquer lugar da página; vão para a aba aberta.
 const imgDrop = $('imgDrop');
-const activeDrop = () => activeTab === 'img' ? imgDrop : drop;
+const activeDrop = () => ({ audio: drop, img: imgDrop, imgconv: $('icDrop'), docs: $('docDrop') })[activeTab];
 const hasDrop = e => [...((e.dataTransfer && e.dataTransfer.types) || [])].some(t => t === 'Files' || t === 'text/uri-list');
 for (const type of ['dragenter', 'dragover']) window.addEventListener(type, e => {
   if (!hasDrop(e) || e.target === linkBox) return;
   e.preventDefault();
   activeDrop().classList.add('over');
 });
-const clearOver = () => { drop.classList.remove('over'); imgDrop.classList.remove('over'); };
+const clearOver = () => { for (const d of document.querySelectorAll('.drop')) d.classList.remove('over'); };
 window.addEventListener('dragleave', e => { if (!e.relatedTarget) clearOver(); });
 window.addEventListener('drop', e => {
   if (e.target === linkBox) return; // solto na caixa de link: o navegador só escreve o link nela
   e.preventDefault();
   clearOver();
   const files = [...e.dataTransfer.files];
-  if (activeTab === 'img') { if (files.length) addImages(files); return; }
+  if (activeTab !== 'audio') { if (files.length) addToTab(activeTab, files); return; }
   if (files.length) addFiles(files);
   else if (e.dataTransfer.getData('text/uri-list')) addLinks(e.dataTransfer.getData('text/uri-list').split('\n').filter(l => !l.startsWith('#')).join(' '));
 });
@@ -1086,13 +1477,543 @@ imgDrop.onclick = () => imgPicker.click();
 imgDrop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); imgPicker.click(); } };
 imgPicker.onchange = () => { addImages([...imgPicker.files]); imgPicker.value = ''; };
 document.addEventListener('paste', e => {
-  if (activeTab !== 'img') return;
+  if (activeTab === 'audio') return;
   const files = [...((e.clipboardData && e.clipboardData.files) || [])];
   if (!files.length) return;
   e.preventDefault();
-  addImages(files);
+  addToTab(activeTab, files);
 });
 refreshImg();
+showOptionFields();
+
+/* ---------- ferramentas da internet, carregadas só quando precisa ---------- */
+const loaded = {};
+const toolError = () => userError('Não consegui baixar uma ferramenta necessária. Confira a internet e tente de novo.');
+function loadScript(path) { // bibliotecas "UMD", que criam uma variável global
+  return loaded[path] = loaded[path] || new Promise((ok, fail) => {
+    const tag = Object.assign(document.createElement('script'), { src: CDN + path, async: true, onload: ok });
+    tag.onerror = () => { tag.remove(); delete loaded[path]; fail(toolError()); };
+    document.head.append(tag);
+  });
+}
+function loadModule(path) { // módulos ES
+  return loaded[path] = loaded[path] || import(CDN + path).catch(e => { console.error(e); delete loaded[path]; throw toolError(); });
+}
+const canvasBlob = (canvas, type, quality) => new Promise((ok, fail) =>
+  canvas.toBlob(b => b && b.type === type ? ok(b) : fail(userError(`Este navegador não consegue gerar ${type.split('/')[1].toUpperCase()}. Tente o Chrome ou o Edge.`)), type, quality));
+const blobBase64 = blob => new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result.slice(r.result.indexOf(',') + 1)); r.readAsDataURL(blob); });
+function onWhite(canvas) { // JPG, BMP e PDF não têm transparência: pinta o fundo de branco
+  const c = Object.assign(document.createElement('canvas'), { width: canvas.width, height: canvas.height }), g = c.getContext('2d');
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(canvas, 0, 0);
+  return c;
+}
+
+/* ---------- fila genérica das abas Imagens e Documentos ---------- */
+function makeQueue(o) {
+  const q = { items: [], busy: false, note: '' }, el = id => $(o.id + id);
+  q.add = files => {
+    const ok = files.filter(o.accept), ignored = files.filter(f => !o.accept(f));
+    for (const g of (o.group ? o.group(ok) : ok.map(f => ({ files: [f] })))) {
+      const it = { id: nextId++, files: g.files, mode: g.mode, name: g.files.length > 1 ? `${g.files.length} ${o.noun[1]}` : g.files[0].name, status: 'fila', progress: 0 };
+      q.items.push(it);
+      q.build(it);
+    }
+    q.note = ignored.length ? `Ignorado (formato não aceito aqui): ${ignored.map(f => f.name).join(', ')}` : '';
+    q.refresh();
+    q.work();
+  };
+  q.work = async () => {
+    if (q.busy) return;
+    q.busy = true;
+    q.refresh();
+    try {
+      let it;
+      while ((it = q.items.find(i => i.status === 'fila'))) await q.one(it);
+    } finally {
+      q.busy = false;
+      q.refresh();
+    }
+  };
+  q.one = async it => {
+    const key = o.key(it);
+    Object.assign(it, { status: 'processando', phase: 'Preparando…', progress: 0, error: '' });
+    q.update(it);
+    await nextPaint();
+    try {
+      const out = await o.run(it, (phase, progress = 0) => {
+        Object.assign(it, { phase, progress });
+        if (Date.now() - (it.shown || 0) > 120) { it.shown = Date.now(); q.update(it); }
+      });
+      q.drop(it);
+      Object.assign(it, { status: 'pronto', key, out, url: URL.createObjectURL(out.blob) });
+    } catch (e) {
+      if (!(e && e.forUser)) console.error(e);
+      q.drop(it);
+      Object.assign(it, { status: 'erro', error: friendlyError(e) });
+    }
+    q.update(it);
+  };
+  q.drop = it => { if (it.url) URL.revokeObjectURL(it.url); it.url = it.out = null; };
+  q.build = it => {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = `<div class="top"><div class="info"><div class="name"></div><div class="meta"></div><div class="state"></div></div>
+<div class="row"><a class="btn green dl hidden"></a><button class="btn rm" title="Tirar da lista">✕</button></div></div>
+<div class="progress"><div class="bar"></div></div><img class="thumb checker hidden" alt="Prévia do resultado">`;
+    const f = sel => row.querySelector(sel);
+    it.row = { row, name: f('.name'), meta: f('.meta'), state: f('.state'), dl: f('.dl'), rm: f('.rm'), bar: f('.bar'), thumb: f('.thumb') };
+    it.row.name.textContent = it.name;
+    const size = it.files.reduce((t, file) => t + file.size, 0), ext = /\.([^.]+)$/.exec(it.files[0].name);
+    it.row.meta.textContent = [it.files.length > 1 ? `${it.files.length} ${o.noun[1]}` : ext ? ext[1].toUpperCase() : 'Arquivo', fmtSize(size), o.meta && o.meta(it)].filter(Boolean).join(' · ');
+    it.row.thumb.onerror = () => it.row.thumb.classList.add('hidden'); // formato que o navegador não mostra (TIFF…)
+    it.row.rm.onclick = () => { q.drop(it); row.remove(); q.items.splice(q.items.indexOf(it), 1); q.refresh(); };
+    el('List').append(row);
+  };
+  q.update = it => {
+    const r = it.row, ready = it.status === 'pronto', pct = Math.round(it.progress * 100);
+    if (it.status === 'fila') { r.state.textContent = '⏳ Na fila'; r.state.className = 'state'; }
+    if (it.status === 'processando') { r.state.textContent = `🔄 ${it.phase}${it.progress ? ` ${pct}%` : ''}`; r.state.className = 'state'; }
+    if (it.status === 'erro') { r.state.textContent = '❌ ' + it.error; r.state.className = 'state err'; }
+    if (ready) {
+      const stale = it.key !== o.key(it);
+      r.state.textContent = `✅ ${it.out.label} pronto: ${[fmtSize(it.out.blob.size), it.out.detail].filter(Boolean).join(' · ')}`
+        + (stale ? ' — ⚠️ as opções mudaram; clique em “Converter de novo” para refazer' : '');
+      r.state.className = 'state ' + (stale ? 'warn' : 'ok');
+    }
+    r.bar.style.width = (ready || it.status === 'erro' ? 100 : pct) + '%';
+    r.bar.className = 'bar' + (ready ? ' done' : it.status === 'erro' ? ' fail' : '');
+    r.dl.classList.toggle('hidden', !ready);
+    if (ready && r.dl.getAttribute('href') !== it.url) {
+      Object.assign(r.dl, { href: it.url, download: it.out.name, textContent: `⬇️ Baixar ${it.out.label}` });
+      r.thumb.classList.toggle('hidden', !it.out.preview);
+      if (it.out.preview) r.thumb.src = it.url;
+    }
+    if (!ready && r.dl.hasAttribute('href')) { r.dl.removeAttribute('href'); r.thumb.removeAttribute('src'); r.thumb.classList.add('hidden'); }
+    r.rm.disabled = it.status === 'processando';
+  };
+  q.refresh = () => {
+    const ready = q.items.filter(i => i.status === 'pronto').length, failed = q.items.filter(i => i.status === 'erro').length;
+    el('Zip').disabled = q.busy || !ready;
+    el('Redo').disabled = q.busy || !q.items.some(i => i.status === 'erro' || (i.status === 'pronto' && i.key !== o.key(i)));
+    el('Clear').disabled = q.busy || !q.items.length;
+    q.items.forEach(q.update);
+    let msg = o.empty;
+    if (q.items.length) {
+      msg = `${plural(q.items.length, ...o.noun)} · ${plural(ready, ...o.done)}`;
+      if (failed) msg += ` · ${failed} com erro`;
+      if (q.items.some(i => i.status === 'processando')) msg += ' · convertendo…';
+    }
+    el('Status').textContent = msg + (q.note ? ` — ${q.note}` : '');
+  };
+  el('Zip').onclick = async () => {
+    const files = q.items.filter(i => i.status === 'pronto').map(i => ({ name: i.out.name, blob: i.out.blob }));
+    q.busy = true;
+    q.note = 'Preparando o .zip…';
+    q.refresh();
+    try { saveBlob(await makeZip(files, () => {}), o.zipName); q.note = ''; }
+    catch (e) { console.error(e); q.note = 'Não consegui montar o .zip: ' + friendlyError(e); }
+    finally { q.busy = false; q.refresh(); q.work(); }
+  };
+  el('Redo').onclick = () => {
+    for (const it of q.items) if (it.status === 'erro' || (it.status === 'pronto' && it.key !== o.key(it))) it.status = 'fila';
+    q.note = '';
+    q.work();
+  };
+  el('Clear').onclick = () => { q.items.forEach(q.drop); q.items.length = 0; el('List').replaceChildren(); q.note = ''; q.refresh(); };
+  const picker = el('File'), zone = el('Drop');
+  zone.onclick = () => picker.click();
+  zone.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); } };
+  picker.onchange = () => { q.add([...picker.files]); picker.value = ''; };
+  q.refresh();
+  return q;
+}
+
+/* ---------- aba Imagens: ler e gerar os 10 formatos ---------- */
+const IMG_EXT = /\.(jpe?g|jfif|png|webp|gif|bmp|tiff?|ico|avif|heic|heif|svg)$/i;
+const isImage = f => /^image\//.test(f.type) || IMG_EXT.test(f.name);
+const IC_OUT = {
+  jpg: { ext: 'jpg', label: 'JPG', quality: true }, png: { ext: 'png', label: 'PNG' }, webp: { ext: 'webp', label: 'WEBP', quality: true },
+  avif: { ext: 'avif', label: 'AVIF', quality: true }, gif: { ext: 'gif', label: 'GIF' }, bmp: { ext: 'bmp', label: 'BMP' },
+  tiff: { ext: 'tif', label: 'TIFF' }, ico: { ext: 'ico', label: 'ICO' }, svg: { ext: 'svg', label: 'SVG' }
+};
+
+function loadImageElement(file) {
+  const blob = /\.svg$/i.test(file.name) ? new Blob([file], { type: 'image/svg+xml' }) : file; // SVG só abre com o tipo certo
+  return new Promise((ok, fail) => {
+    const url = URL.createObjectURL(blob), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); ok(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); fail(userError('Não consegui abrir esta imagem. O arquivo pode estar corrompido ou num formato que o navegador não lê.')); };
+    img.src = url;
+  });
+}
+
+// Abre qualquer um dos formatos e devolve um canvas (já girado conforme a foto e reduzido, se pedido).
+async function imageToCanvas(file, say, maxSide = 0) {
+  const name = file.name.toLowerCase(), type = file.type;
+  let src;
+  if (/\.(heic|heif)$/.test(name) || /hei[cf]/.test(type)) {
+    say('Carregando o leitor de HEIC (só na primeira vez)…');
+    await loadScript('heic2any@0.0.4/dist/heic2any.min.js');
+    say('Lendo a foto HEIC…');
+    const png = await heic2any({ blob: file, toType: 'image/png' }).catch(() => { throw userError('Não consegui ler esta foto HEIC.'); });
+    src = await createImageBitmap(Array.isArray(png) ? png[0] : png);
+  } else if (/\.tiff?$/.test(name) || type === 'image/tiff') {
+    say('Carregando o leitor de TIFF (só na primeira vez)…');
+    await loadScript('pako@1.0.11/dist/pako.min.js');
+    await loadScript('utif@3.1.0/UTIF.js');
+    const buf = await file.arrayBuffer(), ifds = UTIF.decode(buf), page = ifds[0];
+    UTIF.decodeImage(buf, page, ifds);
+    const rgba = UTIF.toRGBA8(page);
+    src = Object.assign(document.createElement('canvas'), { width: page.width, height: page.height });
+    src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba.buffer, rgba.byteOffset, rgba.byteLength), page.width, page.height), 0, 0);
+  } else {
+    try { src = await createImageBitmap(file); } // JPG, PNG, WEBP, GIF, BMP, AVIF, ICO
+    catch { src = await loadImageElement(file); } // SVG e o que sobrar
+  }
+  const w = src.naturalWidth || src.width || 1024, h = src.naturalHeight || src.height || 1024; // SVG sem tamanho vira 1024 px
+  const scale = maxSide && Math.max(w, h) > maxSide ? maxSide / Math.max(w, h) : 1;
+  const canvas = Object.assign(document.createElement('canvas'), { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) });
+  const g = canvas.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(src, 0, 0, canvas.width, canvas.height);
+  if (src.close) src.close();
+  return canvas;
+}
+
+async function encodeImage(canvas, out, quality, say) {
+  const w = canvas.width, h = canvas.height, pixels = () => canvas.getContext('2d').getImageData(0, 0, w, h);
+  switch (out) {
+    case 'jpg': return canvasBlob(onWhite(canvas), 'image/jpeg', quality);
+    case 'png': return canvasBlob(canvas, 'image/png');
+    case 'webp': return canvasBlob(canvas, 'image/webp', quality);
+    case 'avif': {
+      say('Carregando o gerador de AVIF (só na primeira vez)…');
+      const avif = await loadModule('@jsquash/avif@2.1.1/encode.js');
+      say('Gerando AVIF (pode levar alguns segundos)…');
+      return new Blob([await avif.default(pixels(), { quality: Math.round(quality * 100), speed: 8 })], { type: 'image/avif' });
+    }
+    case 'gif': {
+      say('Carregando o gerador de GIF (só na primeira vez)…');
+      const { GIFEncoder, quantize, applyPalette } = await loadModule('gifenc@1.0.3/dist/gifenc.esm.js');
+      const { data } = pixels();
+      let alpha = false;
+      for (let i = 3; i < data.length; i += 4) if (data[i] < 255) { alpha = true; break; }
+      const format = alpha ? 'rgba4444' : 'rgb565', palette = quantize(data, 256, { format, oneBitAlpha: alpha }), index = applyPalette(data, palette, format);
+      const clear = palette.findIndex(c => c[3] === 0), gif = GIFEncoder();
+      gif.writeFrame(index, w, h, { palette, transparent: clear >= 0, transparentIndex: Math.max(0, clear) });
+      gif.finish();
+      return new Blob([gif.bytes()], { type: 'image/gif' });
+    }
+    case 'bmp': { // BMP de 24 bits, linhas de baixo para cima
+      const { data } = onWhite(canvas).getContext('2d').getImageData(0, 0, w, h), row = Math.ceil(w * 3 / 4) * 4, bytes = new Uint8Array(54 + row * h), v = new DataView(bytes.buffer);
+      bytes.set([0x42, 0x4d]);
+      v.setUint32(2, bytes.length, true); v.setUint32(10, 54, true); v.setUint32(14, 40, true); v.setInt32(18, w, true); v.setInt32(22, h, true);
+      v.setUint16(26, 1, true); v.setUint16(28, 24, true); v.setUint32(34, row * h, true); v.setInt32(38, 2835, true); v.setInt32(42, 2835, true);
+      for (let y = 0; y < h; y++) {
+        let p = 54 + (h - 1 - y) * row;
+        for (let x = 0, i = y * w * 4; x < w; x++, i += 4) { bytes[p++] = data[i + 2]; bytes[p++] = data[i + 1]; bytes[p++] = data[i]; }
+      }
+      return new Blob([bytes], { type: 'image/bmp' });
+    }
+    case 'tiff': {
+      say('Carregando o gerador de TIFF (só na primeira vez)…');
+      await loadScript('pako@1.0.11/dist/pako.min.js');
+      await loadScript('utif@3.1.0/UTIF.js');
+      return new Blob([UTIF.encodeImage(new Uint8Array(pixels().data.buffer), w, h)], { type: 'image/tiff' });
+    }
+    case 'ico': { // ícone com vários tamanhos, cada um guardado como PNG
+      const sizes = [16, 24, 32, 48, 64, 128, 256].filter(n => n <= Math.max(16, w, h)), pngs = [];
+      for (const n of sizes) {
+        const c = Object.assign(document.createElement('canvas'), { width: n, height: n }), k = Math.min(n / w, n / h), g = c.getContext('2d');
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(canvas, (n - w * k) / 2, (n - h * k) / 2, w * k, h * k);
+        pngs.push(new Uint8Array(await (await canvasBlob(c, 'image/png')).arrayBuffer()));
+      }
+      const head = new DataView(new ArrayBuffer(6 + 16 * pngs.length));
+      head.setUint16(2, 1, true); head.setUint16(4, pngs.length, true);
+      let offset = head.byteLength;
+      pngs.forEach((png, i) => {
+        const e = 6 + 16 * i;
+        head.setUint8(e, sizes[i] % 256); head.setUint8(e + 1, sizes[i] % 256); head.setUint16(e + 4, 1, true); head.setUint16(e + 6, 32, true);
+        head.setUint32(e + 8, png.length, true); head.setUint32(e + 12, offset, true);
+        offset += png.length;
+      });
+      return new Blob([head, ...pngs], { type: 'image/x-icon' });
+    }
+    case 'svg': { // a imagem vai dentro do SVG (não vira desenho vetorial)
+      const b64 = await blobBase64(await canvasBlob(canvas, 'image/png'));
+      return new Blob([`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+        + `<image width="${w}" height="${h}" xlink:href="data:image/png;base64,${b64}"/></svg>`], { type: 'image/svg+xml' });
+    }
+  }
+}
+
+const icOptions = () => ({ out: $('icOut').value, q: $('icQ').value, size: $('icSize').value });
+const icQueue = makeQueue({
+  id: 'ic', noun: ['imagem', 'imagens'], done: ['pronta', 'prontas'], empty: 'Nenhuma imagem ainda.', zipName: 'imagens-convertidas.zip',
+  key: () => { const o = icOptions(); return JSON.stringify(IC_OUT[o.out].quality ? o : { out: o.out, size: o.size }); },
+  accept: isImage,
+  run: async (it, say) => {
+    const o = icOptions(), fmt = IC_OUT[o.out], file = it.files[0];
+    say('Lendo a imagem…');
+    const canvas = await imageToCanvas(file, say, +o.size);
+    say(`Gerando ${fmt.label}…`);
+    const blob = await encodeImage(canvas, o.out, +o.q, say);
+    return { blob, name: `${baseName(file.name)}.${fmt.ext}`, label: fmt.label, detail: `${canvas.width}×${canvas.height}`, preview: true };
+  }
+});
+const IC_KEY = 'conversor.imagens';
+try {
+  const saved = JSON.parse(localStorage.getItem(IC_KEY) || '{}');
+  for (const id of ['icOut', 'icQ', 'icSize']) if ([...$(id).options].some(op => op.value === saved[id])) $(id).value = saved[id];
+} catch {}
+const icFields = () => $('icQLabel').classList.toggle('hidden', !IC_OUT[$('icOut').value].quality);
+for (const id of ['icOut', 'icQ', 'icSize']) $(id).addEventListener('change', () => {
+  try { localStorage.setItem(IC_KEY, JSON.stringify({ icOut: $('icOut').value, icQ: $('icQ').value, icSize: $('icSize').value })); } catch {}
+  icFields();
+  icQueue.refresh();
+});
+icFields();
+
+/* ---------- aba Documentos ---------- */
+const PDFJS = 'pdfjs-dist@6.3.289/';
+let pdfjsReady = null, docxPreviewReady = null, docxReady = null;
+function pdfjsLib() {
+  pdfjsReady = pdfjsReady || loadModule(PDFJS + 'build/pdf.min.mjs').then(m => { m.GlobalWorkerOptions.workerSrc = CDN + PDFJS + 'build/pdf.worker.min.mjs'; return m; });
+  return pdfjsReady;
+}
+async function openPdf(file) {
+  const pdfjs = await pdfjsLib();
+  try {
+    return await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), cMapUrl: CDN + PDFJS + 'cmaps/', standardFontDataUrl: CDN + PDFJS + 'standard_fonts/', wasmUrl: CDN + PDFJS + 'wasm/' }).promise;
+  } catch (e) {
+    throw userError(/password/i.test(e && e.name) ? 'Este PDF tem senha. Tire a senha antes de converter.' : 'Não consegui abrir este PDF. Ele pode estar corrompido.');
+  }
+}
+// docx-preview (lê Word) e docx (gera Word) usam a mesma variável global "docx": cada um é guardado logo após carregar.
+const docxPreviewLib = () => docxPreviewReady = docxPreviewReady || (async () => {
+  await loadScript('jszip@3.10.2/dist/jszip.min.js');
+  await loadScript('docx-preview@0.4.1/dist/docx-preview.min.js');
+  return window.docx;
+})().catch(e => { docxPreviewReady = null; throw e; });
+const docxLib = () => docxReady = docxReady || loadScript('docx@9.8.1/dist/index.iife.js').then(() => window.docx).catch(e => { docxReady = null; throw e; });
+const sheetLib = () => loadScript('xlsx@0.18.5/dist/xlsx.full.min.js');
+const jspdfLib = () => loadScript('jspdf@4.2.1/dist/jspdf.umd.min.js');
+async function readWorkbook(file) {
+  await sheetLib();
+  try { return XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array', cellDates: true }); }
+  catch { throw userError('Não consegui abrir esta planilha. Ela pode estar corrompida ou protegida por senha.'); }
+}
+
+async function docxToPdf(it, say) {
+  const file = it.files[0];
+  say('Carregando as ferramentas (só na primeira vez)…');
+  const [preview] = await Promise.all([docxPreviewLib(), loadScript('html2canvas@1.4.1/dist/html2canvas.min.js'), jspdfLib()]);
+  say('Lendo o documento…');
+  const host = Object.assign(document.createElement('div'), { className: 'render-host' });
+  document.body.append(host);
+  try {
+    await preview.renderAsync(await file.arrayBuffer(), host, undefined, { inWrapper: false, breakPages: true, renderHeaders: true, renderFooters: true, renderFootnotes: true, useBase64URL: true })
+      .catch(() => { throw userError('Não consegui ler este documento. Ele precisa ser .docx (arquivos .doc antigos: abra no Word e salve como .docx).'); });
+    const pages = [...host.querySelectorAll('section.docx')];
+    if (!pages.length) throw userError('Este documento parece vazio.');
+    let pdf;
+    for (const [i, page] of pages.entries()) {
+      say(`Gerando o PDF… página ${i + 1} de ${pages.length}`, i / pages.length);
+      const canvas = await html2canvas(page, { scale: 2, backgroundColor: '#ffffff', logging: false });
+      const wPt = page.offsetWidth * 0.75, hPt = page.offsetHeight * 0.75, orientation = wPt > hPt ? 'landscape' : 'portrait';
+      if (!pdf) pdf = new jspdf.jsPDF({ unit: 'pt', format: [wPt, hPt], orientation, compress: true });
+      else pdf.addPage([wPt, hPt], orientation);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, wPt, hPt);
+    }
+    return { blob: pdf.output('blob'), name: baseName(file.name) + '.pdf', label: 'PDF', detail: plural(pages.length, 'página', 'páginas') };
+  } finally {
+    host.remove();
+  }
+}
+
+// Junta os pedaços de texto do PDF em linhas (mesma altura) e as linhas em parágrafos (espaço maior ou letra de outro tamanho).
+function pdfParagraphs(content) {
+  const lines = [];
+  for (const item of content.items) {
+    if (!item.str || !item.str.trim()) continue;
+    const [, , c, d, x, y] = item.transform, size = Math.hypot(c, d) || item.height || 10;
+    let line = lines.find(l => Math.abs(l.y - y) < size * 0.5);
+    if (!line) lines.push(line = { y, size, parts: [] });
+    line.parts.push({ x, str: item.str, w: item.width, size });
+    line.size = Math.max(line.size, size);
+  }
+  lines.sort((a, b) => b.y - a.y);
+  const paras = [];
+  let cur = null, prev = null;
+  for (const line of lines) {
+    line.parts.sort((a, b) => a.x - b.x);
+    let text = '', end = null;
+    for (const part of line.parts) {
+      if (end !== null && part.x - end > part.size * 0.2 && !/\s$/.test(text) && !/^\s/.test(part.str)) text += ' ';
+      text += part.str;
+      end = part.x + part.w;
+    }
+    text = text.replace(/\s+/g, ' ').trim();
+    if (!text) continue;
+    if (!cur || prev.y - line.y > Math.max(prev.size, line.size) * 1.7 || Math.abs(line.size - cur.size) > 1.5) paras.push(cur = { size: line.size, text });
+    else cur.text += ' ' + text;
+    prev = line;
+  }
+  return paras;
+}
+
+async function pdfToDocx(it, say) {
+  const file = it.files[0];
+  say('Carregando as ferramentas (só na primeira vez)…');
+  const [, D] = await Promise.all([pdfjsLib(), docxLib()]);
+  say('Lendo o PDF…');
+  const doc = await openPdf(file), sections = [];
+  let chars = 0;
+  for (let n = 1; n <= doc.numPages; n++) {
+    say(`Lendo o texto… página ${n} de ${doc.numPages}`, n / doc.numPages);
+    const page = await doc.getPage(n), vp = page.getViewport({ scale: 1 }), paras = pdfParagraphs(await page.getTextContent());
+    chars += paras.reduce((t, p) => t + p.text.length, 0);
+    sections.push({
+      properties: { page: { size: { width: Math.round(vp.width * 20), height: Math.round(vp.height * 20) }, margin: { top: 1000, bottom: 1000, left: 1000, right: 1000 } } },
+      children: paras.length ? paras.map(p => new D.Paragraph({ spacing: { after: 120 }, children: [new D.TextRun({ text: p.text, size: Math.max(12, Math.round(p.size * 2)) })] })) : [new D.Paragraph('')]
+    });
+  }
+  if (!chars) throw userError('Este PDF não tem texto para copiar (parece uma imagem digitalizada). Use "PDF → Imagens" ou um programa com reconhecimento de texto (OCR).');
+  const blob = await D.Packer.toBlob(new D.Document({ sections }));
+  return { blob, name: baseName(file.name) + '.docx', label: 'DOCX', detail: plural(doc.numPages, 'página', 'páginas') };
+}
+
+async function sheetToPdf(it, say) {
+  const file = it.files[0];
+  say('Carregando as ferramentas (só na primeira vez)…');
+  await Promise.all([sheetLib(), jspdfLib()]);
+  await loadScript('jspdf-autotable@5.0.8/dist/jspdf.plugin.autotable.min.js');
+  say('Lendo a planilha…');
+  const wb = await readWorkbook(file), pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  let sheets = 0;
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '', blankrows: false });
+    if (!rows.length) continue;
+    const cols = Math.max(...rows.map(r => r.length)), body = rows.map(r => Array.from({ length: cols }, (_, i) => r[i] ?? ''));
+    if (sheets++) pdf.addPage();
+    pdf.setFontSize(12);
+    pdf.text(name, 40, 32);
+    autoTable(pdf, {
+      head: [body[0]], body: body.slice(1), startY: 42, theme: 'grid', margin: { left: 40, right: 40 },
+      styles: { fontSize: cols > 12 ? 6 : 8, cellPadding: 3, overflow: 'linebreak' }, headStyles: { fillColor: [39, 52, 80] }
+    });
+  }
+  if (!sheets) throw userError('A planilha está vazia.');
+  return { blob: pdf.output('blob'), name: baseName(file.name) + '.pdf', label: 'PDF', detail: `${plural(sheets, 'aba', 'abas')} · ${plural(pdf.getNumberOfPages(), 'página', 'páginas')}` };
+}
+
+async function sheetToCsvOrXlsx(it, say) {
+  const file = it.files[0], base = baseName(file.name);
+  say('Carregando as ferramentas (só na primeira vez)…');
+  const wb = await readWorkbook(file);
+  if (/\.csv$/i.test(file.name)) {
+    const bytes = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    return { blob: new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name: base + '.xlsx', label: 'XLSX' };
+  }
+  // CSV com ponto e vírgula e marca UTF-8: é o que o Excel em português abre certo, com acentos.
+  const csvs = wb.SheetNames.map(n => ({ name: `${base}${wb.SheetNames.length > 1 ? ' - ' + n : ''}.csv`, blob: new Blob(['﻿' + XLSX.utils.sheet_to_csv(wb.Sheets[n], { FS: ';', blankrows: false })], { type: 'text/csv' }) }));
+  if (csvs.length === 1) return { ...csvs[0], label: 'CSV' };
+  return { blob: await makeZip(csvs, () => {}), name: base + '-csv.zip', label: 'ZIP', detail: `${csvs.length} abas em CSV` };
+}
+
+async function imagesToPdf(it, say) {
+  say('Carregando as ferramentas (só na primeira vez)…');
+  await loadScript('pdf-lib@1.17.1/dist/pdf-lib.min.js');
+  const pdf = await PDFLib.PDFDocument.create(), a4 = $('docPage').value === 'a4';
+  for (const [i, file] of it.files.entries()) {
+    say(`Colocando a imagem ${i + 1} de ${it.files.length}…`, i / it.files.length);
+    const canvas = onWhite(await imageToCanvas(file, say)), sharp = /\.(png|gif|bmp)$/i.test(file.name); // desenhos e prints ficam em PNG, fotos em JPG
+    const bytes = await (await canvasBlob(canvas, sharp ? 'image/png' : 'image/jpeg', 0.9)).arrayBuffer();
+    const img = sharp ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+    if (a4) {
+      const [pw, ph] = img.width > img.height ? [842, 595] : [595, 842], k = Math.min((pw - 56) / img.width, (ph - 56) / img.height);
+      pdf.addPage([pw, ph]).drawImage(img, { x: (pw - img.width * k) / 2, y: (ph - img.height * k) / 2, width: img.width * k, height: img.height * k });
+    } else {
+      pdf.addPage([img.width * 0.75, img.height * 0.75]).drawImage(img, { x: 0, y: 0, width: img.width * 0.75, height: img.height * 0.75 });
+    }
+  }
+  const name = it.files.length > 1 ? 'imagens.pdf' : baseName(it.files[0].name) + '.pdf';
+  return { blob: new Blob([await pdf.save()], { type: 'application/pdf' }), name, label: 'PDF', detail: plural(it.files.length, 'página', 'páginas') };
+}
+
+async function pdfToImages(it, say) {
+  const file = it.files[0], base = baseName(file.name), png = $('docImg').value === 'png', dpi = +$('docDpi').value;
+  say('Carregando as ferramentas (só na primeira vez)…');
+  const doc = await openPdf(file), pages = [], digits = String(doc.numPages).length;
+  for (let n = 1; n <= doc.numPages; n++) {
+    say(`Desenhando a página ${n} de ${doc.numPages}…`, (n - 1) / doc.numPages);
+    const page = await doc.getPage(n), viewport = page.getViewport({ scale: dpi / 72 });
+    const canvas = Object.assign(document.createElement('canvas'), { width: Math.ceil(viewport.width), height: Math.ceil(viewport.height) });
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff' }).promise;
+    pages.push({ name: `${base}-pagina-${String(n).padStart(digits, '0')}.${png ? 'png' : 'jpg'}`, blob: await canvasBlob(canvas, png ? 'image/png' : 'image/jpeg', 0.92) });
+    page.cleanup();
+  }
+  if (pages.length === 1) return { ...pages[0], label: png ? 'PNG' : 'JPG', detail: '1 página', preview: true };
+  return { blob: await makeZip(pages, () => {}), name: `${base}-paginas.zip`, label: 'ZIP', detail: `${pages.length} páginas em ${png ? 'PNG' : 'JPG'}` };
+}
+
+const DOC_MODES = {
+  'docx-pdf': { label: 'Word → PDF', accepts: f => /\.docx$/i.test(f.name), run: docxToPdf,
+    hint: 'O PDF sai igual ao que se vê no Word, mas cada página vira uma imagem (o texto não fica selecionável). Arquivos .doc antigos: abra no Word e salve como .docx antes.' },
+  'pdf-docx': { label: 'PDF → Word', accepts: f => /\.pdf$/i.test(f.name), run: pdfToDocx,
+    hint: 'Vem o texto do PDF organizado em parágrafos, com o tamanho das letras. Imagens, tabelas e o layout exato não são copiados, e PDFs digitalizados (foto de papel) não têm texto.' },
+  'xlsx-pdf': { label: 'Excel → PDF', accepts: f => /\.(xlsx|xlsm|xls|ods|csv)$/i.test(f.name), run: sheetToPdf,
+    hint: 'Cada aba da planilha vira uma tabela no PDF, em folha A4 deitada. Aparecem os valores; as fórmulas, cores e gráficos não.' },
+  'xlsx-csv': { label: 'Excel ↔ CSV', accepts: f => /\.(xlsx|xlsm|xls|ods|csv)$/i.test(f.name), run: sheetToCsvOrXlsx,
+    hint: 'XLSX, XLS ou ODS vira CSV (uma por aba; várias abas vêm num .zip) e CSV vira XLSX. O CSV sai com ponto e vírgula, o padrão do Excel em português.' },
+  'img-pdf': { label: 'Imagens → PDF', accepts: isImage, run: imagesToPdf,
+    hint: 'As imagens escolhidas de uma vez viram um único PDF, uma por página, na ordem em que foram escolhidas. Aceita JPG, PNG, WEBP, HEIC, TIFF e os outros formatos de imagem.' },
+  'pdf-img': { label: 'PDF → Imagens', accepts: f => /\.pdf$/i.test(f.name), run: pdfToImages,
+    hint: 'Cada página do PDF vira uma imagem. Com várias páginas, elas vêm juntas num .zip.' }
+};
+function docModeFor(file) { // a conversão escolhida, se servir para o arquivo; senão a primeira que serve
+  const chosen = $('docMode').value;
+  return DOC_MODES[chosen].accepts(file) ? chosen : Object.keys(DOC_MODES).find(m => DOC_MODES[m].accepts(file));
+}
+const docQueue = makeQueue({
+  id: 'doc', noun: ['arquivo', 'arquivos'], done: ['pronto', 'prontos'], empty: 'Nenhum arquivo ainda.', zipName: 'documentos-convertidos.zip',
+  key: it => JSON.stringify({ mode: it.mode, ...(it.mode === 'img-pdf' ? { page: $('docPage').value } : it.mode === 'pdf-img' ? { img: $('docImg').value, dpi: $('docDpi').value } : {}) }),
+  accept: f => !!docModeFor(f),
+  group: files => {
+    const groups = [], images = [];
+    for (const f of files) { const mode = docModeFor(f); if (mode === 'img-pdf') images.push(f); else groups.push({ files: [f], mode }); }
+    if (images.length) groups.push({ files: images, mode: 'img-pdf' });
+    return groups;
+  },
+  meta: it => DOC_MODES[it.mode].label,
+  run: (it, say) => DOC_MODES[it.mode].run(it, say)
+});
+function docFields() {
+  const mode = $('docMode').value;
+  $('docHint').textContent = DOC_MODES[mode].hint;
+  for (const label of document.querySelectorAll('#panel-docs [data-doc]')) label.classList.toggle('hidden', label.dataset.doc !== mode);
+}
+const DOC_KEY = 'conversor.documentos';
+try {
+  const saved = JSON.parse(localStorage.getItem(DOC_KEY) || '{}');
+  for (const id of ['docMode', 'docPage', 'docImg', 'docDpi']) if ([...$(id).options].some(op => op.value === saved[id])) $(id).value = saved[id];
+} catch {}
+for (const id of ['docMode', 'docPage', 'docImg', 'docDpi']) $(id).addEventListener('change', () => {
+  try { localStorage.setItem(DOC_KEY, JSON.stringify(Object.fromEntries(['docMode', 'docPage', 'docImg', 'docDpi'].map(k => [k, $(k).value])))); } catch {}
+  docFields();
+  docQueue.refresh();
+});
+docFields();
+
+// Arquivos soltos ou colados vão para a aba aberta.
+function addToTab(tab, files) {
+  if (tab === 'img') addImages(files);
+  else if (tab === 'imgconv') icQueue.add(files);
+  else if (tab === 'docs') docQueue.add(files);
+}
 </script>
 </body>
 </html>
