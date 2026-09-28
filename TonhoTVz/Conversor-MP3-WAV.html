@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Conversor para WAV</title>
+<title>Conversor</title>
 <style>
 :root{--bg:#080d18;--card:#111a2d;--card2:#0c1424;--line:#26324b;--text:#edf3ff;--muted:#94a1bd;--blue:#6ea8fe;--green:#4fd17b;--red:#ff6868;--yellow:#ffd166}
 *{box-sizing:border-box}
@@ -37,16 +37,35 @@ input[type=url]{flex:1 1 280px;min-width:0;padding:10px}
 .bar{height:100%;width:0;background:var(--blue);transition:width .15s}
 .bar.done{background:var(--green)}.bar.fail{background:var(--red)}
 audio{width:100%;margin-top:10px;height:38px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--card2);color:var(--muted);border-radius:10px;padding:10px 16px;font:inherit;font-weight:650;cursor:pointer}
+.tab:hover{color:var(--text)}.tab[aria-selected=true]{background:var(--blue);border-color:var(--blue);color:#07101f}
+.intro{color:var(--muted);margin:14px 0 0}
+input[type=color]{width:100%;height:40px;padding:3px;background:#070c16;border:1px solid var(--line);border-radius:8px}
+.pics{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pics figure{margin:0;display:flex;flex-direction:column;gap:4px}
+.pics figcaption{font-size:12px;color:var(--muted)}
+.frame{aspect-ratio:4/3;border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#070c16}
+.frame img{max-width:100%;max-height:100%;display:block}
+.checker{background:repeating-conic-gradient(#c9ced8 0 25%,#fff 0 50%) 0 0/18px 18px}
 .hidden{display:none!important}
-@media(max-width:700px){.wrap{padding:13px}.hero h1{font-size:23px}.opts{grid-template-columns:1fr}}
+@media(max-width:700px){.wrap{padding:13px}.hero h1{font-size:23px}.opts{grid-template-columns:1fr}.pics{gap:6px}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div class="hero">
-<h1>🎵 Conversor para WAV</h1>
-<p>Transforma MP3 e vídeos (como o MP4 baixado do YouTube Studio) em áudio WAV. A conversão acontece no seu navegador: os arquivos não são enviados para nenhum servidor e a página funciona até sem internet.</p>
+<h1>🧰 Conversor</h1>
+<p>Tudo acontece no seu navegador: os arquivos não são enviados para nenhum servidor.</p>
 </div>
+
+<div class="tabs" role="tablist">
+<button class="tab" role="tab" data-tab="audio" aria-selected="true" aria-controls="panel-audio">🎵 Áudio para WAV</button>
+<button class="tab" role="tab" data-tab="img" aria-selected="false" aria-controls="panel-img">🖼️ Remover fundo</button>
+</div>
+
+<section id="panel-audio" role="tabpanel">
+<p class="intro">Transforma MP3 e vídeos (como o MP4 baixado do YouTube Studio) em áudio WAV. Funciona até sem internet.</p>
 
 <div class="card">
 <h3>1. Formato do WAV</h3>
@@ -108,6 +127,46 @@ Links do YouTube, Instagram, TikTok e outras plataformas não funcionam: elas n�
 <div id="status" class="status">Nenhum arquivo ainda.</div>
 <div id="list"></div>
 </div>
+</section>
+
+<section id="panel-img" role="tabpanel" hidden>
+<p class="intro">Remove o fundo de fotos com inteligência artificial, como o remove.bg, mas a imagem não sai do seu computador.</p>
+<div class="card">
+<h3>1. Escolha as imagens</h3>
+<div class="drop" id="imgDrop" role="button" tabindex="0">
+<b>🖼️ Clique para escolher as imagens</b>
+<span class="hint">ou arraste para esta página, ou cole com Ctrl+V (JPG, PNG, WebP). Pode ser várias de uma vez; o fundo sai sozinho.</span>
+</div>
+<input id="imgFile" type="file" accept="image/*" multiple hidden>
+<div class="opts" style="margin-top:14px">
+<label>Qualidade
+<select id="imgModel">
+<option value="medium">Normal (recomendada)</option>
+<option value="small">Rápida (modelo menor)</option>
+</select></label>
+<label>Fundo do resultado
+<select id="imgBg">
+<option value="transparent">Transparente</option>
+<option value="color">Cor sólida</option>
+</select></label>
+<label id="imgColorLabel" class="hidden">Cor do fundo
+<input type="color" id="imgColor" value="#ffffff"></label>
+</div>
+<p class="hint">Na primeira vez a página baixa o modelo de IA (cerca de 100 MB na qualidade normal ou 55 MB na rápida), por isso precisa de internet; depois ele fica guardado no navegador.
+O resultado sai em PNG, no mesmo tamanho da foto original. Funciona melhor quando há um objeto principal bem visível (pessoa, animal, produto).</p>
+</div>
+
+<div class="card">
+<h3>2. Baixar as imagens</h3>
+<div class="row">
+<button class="btn green" id="imgZip" disabled>⬇️ Baixar todas (.zip)</button>
+<button class="btn primary" id="imgRedo" disabled>🔄 Refazer com a qualidade atual</button>
+<button class="btn danger" id="imgClear" disabled>Limpar lista</button>
+</div>
+<div id="imgStatus" class="status">Nenhuma imagem ainda.</div>
+<div id="imgList"></div>
+</div>
+</section>
 </div>
 
 <script>
@@ -641,9 +700,9 @@ async function makeZip(list, onProgress) {
   const total = list.reduce((s, x) => s + x.blob.size, 0) || 1;
   const parts = [], central = [];
   let offset = 0, hashed = 0;
-  for (const { base, blob } of list) {
-    let fileName = base + '.wav';
-    for (let n = 2; used.has(fileName.toLowerCase()); n++) fileName = `${base} (${n}).wav`;
+  for (const { name: wanted, blob } of list) {
+    let fileName = wanted;
+    for (let n = 2; used.has(fileName.toLowerCase()); n++) fileName = wanted.replace(/(\.[^.]*)?$/, ext => ` (${n})${ext}`);
     used.add(fileName.toLowerCase());
     const name = enc.encode(fileName), size = blob.size;
     let crc = crcCache.get(blob);
@@ -698,9 +757,18 @@ async function makeZip(list, onProgress) {
   return new Blob([...parts, ...central, end], { type: 'application/zip' });
 }
 
+function saveBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: fileName });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 $('zip').onclick = async () => {
   // Cópia fixa: tirar um item da lista no meio não atrapalha o .zip.
-  const list = items.filter(i => i.status === 'pronto').map(i => ({ base: baseName(i.name), blob: i.blob }));
+  const list = items.filter(i => i.status === 'pronto').map(i => ({ name: baseName(i.name) + '.wav', blob: i.blob }));
   busy = true;
   note = 'Preparando o .zip…';
   refresh();
@@ -710,12 +778,7 @@ $('zip').onclick = async () => {
       const pct = Math.floor(f * 100);
       if (pct !== shown) { shown = pct; note = `Preparando o .zip… ${pct}%`; refresh(); }
     });
-    const url = URL.createObjectURL(zip);
-    const a = Object.assign(document.createElement('a'), { href: url, download: 'wav-convertidos.zip' });
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    saveBlob(zip, 'wav-convertidos.zip');
     note = '';
   } catch (e) {
     console.error(e);
@@ -752,21 +815,284 @@ const addLinkFromBox = () => { if (linkBox.value.trim()) linkBox.value = addLink
 $('addLink').onclick = addLinkFromBox;
 linkBox.onkeydown = e => { if (e.key === 'Enter') addLinkFromBox(); };
 
-// Arquivos ou links (arrastados de outra aba) podem ser soltos em qualquer lugar da página.
+/* ---------- abas ---------- */
+const TAB_KEY = 'conversor.aba';
+let activeTab = 'audio';
+function showTab(name) {
+  activeTab = name;
+  for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', b.dataset.tab === name);
+  $('panel-audio').hidden = name !== 'audio';
+  $('panel-img').hidden = name !== 'img';
+  try { localStorage.setItem(TAB_KEY, name); } catch {}
+}
+for (const b of document.querySelectorAll('.tab')) b.onclick = () => showTab(b.dataset.tab);
+try { if (localStorage.getItem(TAB_KEY) === 'img') showTab('img'); } catch {}
+
+// Arquivos ou links (arrastados de outra aba) podem ser soltos em qualquer lugar da página; vão para a aba aberta.
+const imgDrop = $('imgDrop');
+const activeDrop = () => activeTab === 'img' ? imgDrop : drop;
 const hasDrop = e => [...((e.dataTransfer && e.dataTransfer.types) || [])].some(t => t === 'Files' || t === 'text/uri-list');
 for (const type of ['dragenter', 'dragover']) window.addEventListener(type, e => {
   if (!hasDrop(e) || e.target === linkBox) return;
   e.preventDefault();
-  drop.classList.add('over');
+  activeDrop().classList.add('over');
 });
-window.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
+const clearOver = () => { drop.classList.remove('over'); imgDrop.classList.remove('over'); };
+window.addEventListener('dragleave', e => { if (!e.relatedTarget) clearOver(); });
 window.addEventListener('drop', e => {
   if (e.target === linkBox) return; // solto na caixa de link: o navegador só escreve o link nela
   e.preventDefault();
-  drop.classList.remove('over');
-  if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]);
+  clearOver();
+  const files = [...e.dataTransfer.files];
+  if (activeTab === 'img') { if (files.length) addImages(files); return; }
+  if (files.length) addFiles(files);
   else if (e.dataTransfer.getData('text/uri-list')) addLinks(e.dataTransfer.getData('text/uri-list').split('\n').filter(l => !l.startsWith('#')).join(' '));
 });
+
+/* ---------- remover fundo ---------- */
+// Usa a biblioteca aberta @imgly/background-removal (licença AGPL-3.0): um modelo de IA (IS-Net)
+// que roda no próprio navegador. A biblioteca e o modelo vêm da internet no primeiro uso.
+const BG_LIB = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm';
+const BG_DATA = 'https://staticimgly.com/@imgly/background-removal-data/1.4.5/dist/';
+const IMG_OPT_KEY = 'conversor.removerFundo';
+const imgItems = [];
+let imgBusy = false, imgNote = '', pasted = 0, bgLib = null;
+const loadedModels = new Set();
+const nextPaint = () => new Promise(r => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 100); });
+
+try {
+  const saved = JSON.parse(localStorage.getItem(IMG_OPT_KEY) || '{}');
+  for (const id of ['imgModel', 'imgBg']) if ([...$(id).options].some(o => o.value === saved[id])) $(id).value = saved[id];
+  if (/^#[0-9a-f]{6}$/i.test(saved.imgColor)) $('imgColor').value = saved.imgColor;
+} catch {}
+for (const id of ['imgModel', 'imgBg', 'imgColor']) $(id).addEventListener('input', () => {
+  try { localStorage.setItem(IMG_OPT_KEY, JSON.stringify({ imgModel: $('imgModel').value, imgBg: $('imgBg').value, imgColor: $('imgColor').value })); } catch {}
+  refreshImg();
+});
+
+// Guarda o modelo no cache do navegador, para não baixar tudo de novo a cada visita.
+const plainFetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const url = input instanceof Request ? input.url : String(input); // a biblioteca passa objetos URL
+  if (!url.startsWith(BG_DATA)) return plainFetch(input, init);
+  let cache = null;
+  try {
+    cache = await caches.open('remover-fundo-1.4.5');
+    const hit = await cache.match(url);
+    if (hit) return hit;
+  } catch {}
+  const res = await plainFetch(input, init);
+  if (cache && res.ok) cache.put(url, res.clone()).catch(() => {});
+  return res;
+};
+
+function loadBgLib() {
+  bgLib = bgLib || import(BG_LIB).catch(e => {
+    console.error(e);
+    bgLib = null;
+    throw userError('Não consegui carregar a ferramenta de IA. Confira a internet e tente de novo.');
+  });
+  return bgLib;
+}
+
+function addImages(files) {
+  const ignored = [];
+  for (let file of files) {
+    if (!/^image\//.test(file.type)) { ignored.push(file.name); continue; }
+    if (file.name === 'image.png') file = new File([file], `imagem colada ${++pasted}.png`, { type: file.type }); // print colado
+    const it = { id: nextId++, name: file.name, file, status: 'fila', progress: 0 };
+    imgItems.push(it);
+    buildImgRow(it);
+  }
+  imgNote = ignored.length ? `Ignorado (não é imagem): ${ignored.join(', ')}` : '';
+  refreshImg();
+  processImages();
+}
+
+async function processImages() {
+  if (imgBusy) return;
+  imgBusy = true;
+  refreshImg();
+  try {
+    let it;
+    while ((it = imgItems.find(i => i.status === 'fila'))) await processImage(it);
+  } finally {
+    imgBusy = false;
+    refreshImg();
+  }
+}
+
+async function processImage(it) {
+  const model = $('imgModel').value, fetched = {};
+  let shown = 0;
+  const ready = loadedModels.has(model);
+  Object.assign(it, { status: 'processando', phase: ready ? 'Removendo o fundo…' : 'Carregando a ferramenta de IA…', progress: 0, error: '' });
+  updateImgRow(it);
+  await nextPaint(); // a IA trava a página por alguns segundos: mostra o aviso antes
+  try {
+    const { removeBackground } = await loadBgLib();
+    const blob = await removeBackground(it.file, {
+      model, publicPath: BG_DATA,
+      proxyToWorker: false, // o "worker" da biblioteca não abre quando ela vem de uma CDN
+      progress: (key, current, total) => {
+        if (!key.startsWith('fetch:')) return;
+        fetched[key] = [current, total];
+        const [got, all] = Object.values(fetched).reduce(([a, b], [c, t]) => [a + c, b + t], [0, 0]);
+        Object.assign(it, got < all
+          ? { phase: `Baixando o modelo de IA (só na primeira vez)… ${fmtSize(got)}`, progress: got / all }
+          : { phase: 'Removendo o fundo…', progress: 0 });
+        if (Date.now() - shown > 150 || got >= all) { shown = Date.now(); updateImgRow(it); }
+      }
+    });
+    loadedModels.add(model);
+    clearImgOutput(it);
+    Object.assign(it, { status: 'pronto', model, result: blob, resultUrl: URL.createObjectURL(blob) });
+  } catch (e) {
+    console.error(e);
+    clearImgOutput(it);
+    Object.assign(it, { status: 'erro', error: imgError(e) });
+  }
+  updateImgRow(it);
+}
+
+function imgError(e) {
+  if (e && e.forUser) return e.message;
+  if (e instanceof RangeError || /memory|alloc/i.test(e && e.message)) return 'Faltou memória no navegador para esta imagem. Tente uma imagem menor ou a qualidade rápida.';
+  if (/fetch|network|load/i.test(e && e.message)) return 'Não consegui baixar o modelo de IA. Confira a internet e tente de novo.';
+  return 'Não consegui processar esta imagem (o formato pode não ser suportado). Detalhe: ' + ((e && e.message) || e);
+}
+
+function clearImgOutput(it) {
+  if (it.resultUrl) URL.revokeObjectURL(it.resultUrl);
+  it.resultUrl = it.result = null;
+}
+
+// Com "cor sólida", pinta o fundo antes de salvar; senão devolve o PNG transparente.
+async function finalImage(it) {
+  if ($('imgBg').value !== 'color') return it.result;
+  const bmp = await createImageBitmap(it.result);
+  const canvas = Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+  const g = canvas.getContext('2d');
+  g.fillStyle = $('imgColor').value;
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.drawImage(bmp, 0, 0);
+  bmp.close();
+  return new Promise((ok, fail) => canvas.toBlob(b => b ? ok(b) : fail(new Error('toBlob')), 'image/png'));
+}
+const outName = it => baseName(it.name) + '-sem-fundo.png';
+
+function buildImgRow(it) {
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.innerHTML = `<div class="top"><div class="info"><div class="name"></div><div class="meta"></div><div class="state"></div></div>
+<div class="row"><button class="btn green dl hidden">⬇️ Baixar PNG</button><button class="btn rm" title="Tirar da lista">✕</button></div></div>
+<div class="progress"><div class="bar"></div></div>
+<div class="pics"><figure><figcaption>Antes</figcaption><div class="frame"><img class="orig" alt="Imagem original"></div></figure>
+<figure><figcaption>Depois</figcaption><div class="frame"><img class="out hidden" alt="Imagem sem fundo"></div></figure></div>`;
+  const q = sel => el.querySelector(sel);
+  it.origUrl = URL.createObjectURL(it.file);
+  it.row = { el, name: q('.name'), meta: q('.meta'), state: q('.state'), dl: q('.dl'), rm: q('.rm'), bar: q('.bar'), orig: q('.orig'), out: q('.out') };
+  it.row.name.textContent = it.name;
+  it.row.orig.onload = () => { it.size = `${it.row.orig.naturalWidth}×${it.row.orig.naturalHeight}`; updateImgRow(it); };
+  it.row.orig.src = it.origUrl;
+  it.row.dl.onclick = async () => {
+    try { saveBlob(await finalImage(it), outName(it)); } catch (e) { console.error(e); imgNote = 'Não consegui salvar a imagem: ' + imgError(e); refreshImg(); }
+  };
+  it.row.rm.onclick = () => {
+    clearImgOutput(it);
+    URL.revokeObjectURL(it.origUrl);
+    el.remove();
+    imgItems.splice(imgItems.indexOf(it), 1);
+    refreshImg();
+  };
+  $('imgList').append(el);
+}
+
+function updateImgRow(it) {
+  const r = it.row, ready = it.status === 'pronto', pct = Math.round(it.progress * 100);
+  const ext = /\.([^.]+)$/.exec(it.name);
+  r.meta.textContent = [ext ? ext[1].toUpperCase() : 'Imagem', fmtSize(it.file.size), it.size].filter(Boolean).join(' · ');
+  if (it.status === 'fila') { r.state.textContent = '⏳ Na fila'; r.state.className = 'state'; }
+  if (it.status === 'processando') { r.state.textContent = `🔄 ${it.phase}${it.progress ? ` ${pct}%` : ''}`; r.state.className = 'state'; }
+  if (it.status === 'erro') { r.state.textContent = '❌ ' + it.error; r.state.className = 'state err'; }
+  if (ready) {
+    const stale = it.model !== $('imgModel').value;
+    r.state.textContent = '✅ Fundo removido' + (stale ? ' — ⚠️ a qualidade mudou; clique em “Refazer” para usar a nova' : '');
+    r.state.className = 'state ' + (stale ? 'warn' : 'ok');
+  }
+  r.bar.style.width = (ready || it.status === 'erro' ? 100 : pct) + '%';
+  r.bar.className = 'bar' + (ready ? ' done' : it.status === 'erro' ? ' fail' : '');
+  r.dl.classList.toggle('hidden', !ready);
+  r.out.classList.toggle('hidden', !ready);
+  if (ready && r.out.getAttribute('src') !== it.resultUrl) r.out.src = it.resultUrl;
+  if (!ready && r.out.hasAttribute('src')) r.out.removeAttribute('src');
+  const color = $('imgBg').value === 'color';
+  r.out.classList.toggle('checker', !color); // fundo só atrás da imagem, para ver o recorte
+  r.out.style.background = color ? $('imgColor').value : '';
+  r.rm.disabled = it.status === 'processando';
+}
+
+function refreshImg() {
+  $('imgColorLabel').classList.toggle('hidden', $('imgBg').value !== 'color');
+  const ready = imgItems.filter(i => i.status === 'pronto').length, failed = imgItems.filter(i => i.status === 'erro').length;
+  $('imgZip').disabled = imgBusy || !ready;
+  $('imgRedo').disabled = imgBusy || !imgItems.some(i => i.status === 'erro' || (i.status === 'pronto' && i.model !== $('imgModel').value));
+  $('imgClear').disabled = imgBusy || !imgItems.length;
+  imgItems.forEach(updateImgRow);
+  let msg = 'Nenhuma imagem ainda.';
+  if (imgItems.length) {
+    msg = `${plural(imgItems.length, 'imagem', 'imagens')} · ${plural(ready, 'pronta', 'prontas')}`;
+    if (failed) msg += ` · ${failed} com erro`;
+    if (imgItems.some(i => i.status === 'processando')) msg += ' · processando…';
+  }
+  $('imgStatus').textContent = msg + (imgNote ? ` — ${imgNote}` : '');
+}
+
+$('imgZip').onclick = async () => {
+  const list = imgItems.filter(i => i.status === 'pronto');
+  imgBusy = true;
+  imgNote = 'Preparando o .zip…';
+  refreshImg();
+  try {
+    const files = [];
+    for (const it of list) files.push({ name: outName(it), blob: await finalImage(it) });
+    saveBlob(await makeZip(files, () => {}), 'imagens-sem-fundo.zip');
+    imgNote = '';
+  } catch (e) {
+    console.error(e);
+    imgNote = 'Não consegui montar o .zip: ' + imgError(e);
+  } finally {
+    imgBusy = false;
+    refreshImg();
+    processImages(); // imagens que chegaram enquanto o .zip era montado
+  }
+};
+$('imgRedo').onclick = () => {
+  const model = $('imgModel').value;
+  for (const it of imgItems) if (it.status === 'erro' || (it.status === 'pronto' && it.model !== model)) it.status = 'fila';
+  imgNote = '';
+  processImages();
+};
+$('imgClear').onclick = () => {
+  for (const it of imgItems) { clearImgOutput(it); URL.revokeObjectURL(it.origUrl); }
+  imgItems.length = 0;
+  $('imgList').replaceChildren();
+  imgNote = '';
+  refreshImg();
+};
+
+const imgPicker = $('imgFile');
+imgDrop.onclick = () => imgPicker.click();
+imgDrop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); imgPicker.click(); } };
+imgPicker.onchange = () => { addImages([...imgPicker.files]); imgPicker.value = ''; };
+document.addEventListener('paste', e => {
+  if (activeTab !== 'img') return;
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+  if (!files.length) return;
+  e.preventDefault();
+  addImages(files);
+});
+refreshImg();
 </script>
 </body>
 </html>
