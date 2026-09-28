@@ -16,7 +16,9 @@ h3{margin-top:0}
 .btn{border:0;border-radius:9px;padding:10px 14px;background:#273450;color:#fff;cursor:pointer;font:inherit;font-weight:650;text-decoration:none;display:inline-block}
 .btn:hover{filter:brightness(1.12)}.primary{background:var(--blue);color:#07101f}.green{background:var(--green);color:#07140b}.danger{background:#53252b}
 .btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
-select{background:#070c16;color:#fff;border:1px solid var(--line);border-radius:8px;padding:9px;font:inherit}
+select,input[type=url]{background:#070c16;color:#fff;border:1px solid var(--line);border-radius:8px;padding:9px;font:inherit}
+input[type=url]{flex:1 1 280px;min-width:0;padding:10px}
+.link-row{margin-top:12px}
 .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .opts label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
 .hint{font-size:12px;color:var(--muted);line-height:1.5}
@@ -87,6 +89,12 @@ Vídeos com som 5.1 viram estéreo.
 <span class="hint">ou arraste para esta página: MP3, vídeos (MP4, WebM, MOV…) e outros áudios (M4A, OGG, FLAC, WAV…). Pode ser vários de uma vez; a conversão começa sozinha.</span>
 </div>
 <input id="file" type="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.m4v,.mov,.webm,.mkv,.ogg,.oga,.opus,.aac,.flac,.wav,.3gp" multiple hidden>
+<div class="row link-row">
+<input id="link" type="url" placeholder="Ou cole o link de um arquivo" autocomplete="off" aria-label="Link do arquivo">
+<button class="btn primary" id="addLink">🔗 Adicionar link</button>
+</div>
+<p class="hint">O link precisa levar ao arquivo em si, e dá para colar vários de uma vez (Dropbox, Google Drive, GitHub ou um link direto de site). Alguns sites não deixam outras páginas lerem os arquivos; quando isso acontecer a página avisa, e aí é só abrir o link, baixar o arquivo e arrastar para cá.
+Links do YouTube, Instagram, TikTok e outras plataformas não funcionam: elas não permitem baixar por fora delas.</p>
 <p class="hint"><b>Vídeos do seu canal no YouTube:</b> abra o YouTube Studio → Conteúdo, passe o mouse no vídeo, clique em ⋮ (Opções) → Baixar e depois arraste o MP4 baixado para cá.</p>
 </div>
 
@@ -371,13 +379,109 @@ function addFiles(files) {
   const ignored = [];
   for (const file of files) {
     if (!MEDIA_EXT.test(file.name) && !/^(audio|video)\//.test(file.type)) { ignored.push(file.name); continue; }
-    const it = { id: nextId++, file, status: 'fila', progress: 0 };
+    const it = { id: nextId++, name: file.name, file, status: 'fila', progress: 0 };
     items.push(it);
     buildRow(it);
   }
   note = ignored.length ? `Ignorado (não é áudio nem vídeo): ${ignored.join(', ')}` : '';
   refresh();
   convertAll();
+}
+
+/* ---------- links ---------- */
+const PLATFORMS = /(^|\.)(youtube\.com|youtu\.be|instagram\.com|tiktok\.com|facebook\.com|fb\.watch|soundcloud\.com|vimeo\.com|spotify\.com|deezer\.com|twitch\.tv|kwai\.com|twitter\.com|x\.com)$/i;
+const TYPE_EXT = { 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/x-wav': 'wav', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac',
+  'audio/ogg': 'ogg', 'audio/flac': 'flac', 'audio/webm': 'webm', 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
+const PAGE_NOT_FILE = 'Esse link abre uma página, não o arquivo em si. Abra o link, baixe o arquivo e arraste para cá.';
+
+function addLinks(textValue) {
+  const bad = [];
+  let platform = false;
+  for (const raw of textValue.split(/\s+/).filter(Boolean)) {
+    let u;
+    try { u = new URL(raw); } catch { bad.push(raw); continue; }
+    if (!/^https?:$/.test(u.protocol)) { bad.push(raw); continue; }
+    if (PLATFORMS.test(u.hostname)) { platform = true; continue; }
+    const it = { id: nextId++, name: nameFromUrl(u), link: u.href, file: null, status: 'fila', progress: 0 };
+    items.push(it);
+    buildRow(it);
+  }
+  note = [
+    platform && 'Links do YouTube, Instagram, TikTok e outras plataformas não funcionam aqui: elas não permitem baixar por fora delas. Peça o arquivo original para quem publicou.',
+    bad.length && `Não parece um link: ${bad.join(' ')}`
+  ].filter(Boolean).join(' ');
+  refresh();
+  convertAll();
+  return bad; // o que não era link volta para a caixa, para corrigir
+}
+
+function nameFromUrl(u) {
+  let last = u.pathname.split('/').filter(Boolean).pop() || '';
+  try { last = decodeURIComponent(last); } catch {}
+  return /\.[a-z0-9]{2,4}$/i.test(last) ? last : `arquivo de ${u.hostname.replace(/^www\./, '')}`;
+}
+
+// Troca links de compartilhamento pelo endereço que entrega o arquivo em si.
+function directLink(href) {
+  const u = new URL(href), host = u.hostname.toLowerCase();
+  if (/(^|\.)dropbox\.com$/.test(host)) {
+    u.hostname = 'dl.dropboxusercontent.com';
+    u.searchParams.delete('dl');
+    return u.href;
+  }
+  if (host === 'drive.google.com') {
+    const id = (/\/file\/d\/([\w-]+)/.exec(u.pathname) || [])[1] || u.searchParams.get('id');
+    if (id) return `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`;
+  }
+  if (host === 'github.com' && /^\/[^/]+\/[^/]+\/blob\//.test(u.pathname)) {
+    u.hostname = 'raw.githubusercontent.com';
+    u.pathname = u.pathname.replace('/blob/', '/');
+  }
+  return u.href;
+}
+
+function dispositionName(h) {
+  if (!h) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8'')?"?([^";]+)"?/i.exec(h);
+  if (star) try { return decodeURIComponent(star[1].trim()); } catch {}
+  const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(h);
+  return plain ? plain[1].trim() : null;
+}
+
+async function download(it) {
+  let res;
+  try {
+    res = await fetch(directLink(it.link));
+  } catch {
+    throw userError('Este site não deixa outras páginas lerem o arquivo (ou o link está fora do ar). Abra o link no navegador, baixe o arquivo e arraste para cá.');
+  }
+  if (!res.ok) throw userError(`O link respondeu com erro ${res.status}. Confira se ele está certo e se o arquivo é público.`);
+  const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (type === 'text/html') throw userError(PAGE_NOT_FILE);
+
+  const total = +res.headers.get('content-length') || 0, reader = res.body.getReader(), parts = [];
+  let got = 0, shown = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    parts.push(value);
+    got += value.length;
+    if (Date.now() - shown > 150) {
+      shown = Date.now();
+      Object.assign(it, { phase: `Baixando o link… ${fmtSize(got)}${total ? ' de ' + fmtSize(total) : ''}`, progress: total ? got / total : 0 });
+      updateRow(it);
+    }
+  }
+  const blob = new Blob(parts, { type });
+  const head = new TextDecoder().decode(await blob.slice(0, 256).arrayBuffer());
+  if (/^\s*<(!doctype|html|head|body)/i.test(head.replace(/^﻿/, ''))) throw userError(PAGE_NOT_FILE);
+
+  const hasExt = n => /\.[a-z0-9]{2,4}$/i.test(n);
+  let name = dispositionName(res.headers.get('content-disposition'));
+  if (!name) name = hasExt(it.name) || !res.url ? it.name : nameFromUrl(new URL(res.url)); // depois de redirecionar, o endereço final pode ter o nome
+  if (!hasExt(name) && TYPE_EXT[type]) name += '.' + TYPE_EXT[type];
+  it.name = name;
+  it.file = new File([blob], name, { type });
 }
 
 async function convertAll() {
@@ -398,6 +502,9 @@ async function convertItem(it) {
   Object.assign(it, { status: 'convertendo', phase: 'Lendo o arquivo…', progress: 0, error: '' });
   updateRow(it);
   try {
+    if (!it.file) await download(it);
+    Object.assign(it, { phase: 'Lendo o arquivo…', progress: 0 });
+    updateRow(it);
     const bytes = await it.file.arrayBuffer();
     const srcRate = sourceSampleRate(new Uint8Array(bytes));
     const rate = opt.rate === 'orig' ? (srcRate || 44100) : +opt.rate;
@@ -436,7 +543,6 @@ function buildRow(it) {
 <div class="progress"><div class="bar"></div></div><audio controls preload="none" class="hidden"></audio>`;
   const q = s => el.querySelector(s);
   it.row = { el, name: q('.name'), meta: q('.meta'), state: q('.state'), dl: q('.dl'), rm: q('.rm'), bar: q('.bar'), audio: q('audio') };
-  it.row.name.textContent = it.file.name;
   it.row.rm.onclick = () => {
     clearOutput(it);
     el.remove();
@@ -448,14 +554,16 @@ function buildRow(it) {
 
 function updateRow(it) {
   const r = it.row, inf = it.info, ready = it.status === 'pronto';
-  const ext = /\.([^.]+)$/.exec(it.file.name);
-  let meta = `${ext ? ext[1].toUpperCase() : 'Arquivo'} · ${fmtSize(it.file.size)}`;
+  if (r.name.textContent !== it.name) r.name.textContent = it.name;
+  const ext = /\.([^.]+)$/.exec(it.name);
+  let meta = it.file ? `${ext ? ext[1].toUpperCase() : 'Arquivo'} · ${fmtSize(it.file.size)}` : 'Link';
+  if (it.link) meta += ` · de ${new URL(it.link).hostname.replace(/^www\./, '')}`;
   if (inf) meta += ` · ${inf.srcRate ? fmtRate(inf.srcRate) : 'taxa original não detectada'} · ${chName(inf.srcCh)}`;
   r.meta.textContent = meta;
 
   const pct = Math.round(it.progress * 100);
   if (it.status === 'fila') { r.state.textContent = '⏳ Na fila'; r.state.className = 'state'; }
-  if (it.status === 'convertendo') { r.state.textContent = `🔄 ${it.phase} ${pct}%`; r.state.className = 'state'; }
+  if (it.status === 'convertendo') { r.state.textContent = `🔄 ${it.phase}${it.progress ? ` ${pct}%` : ''}`; r.state.className = 'state'; }
   if (it.status === 'erro') { r.state.textContent = '❌ ' + it.error; r.state.className = 'state err'; }
   if (ready) {
     const stale = it.key !== optionsKey();
@@ -470,7 +578,7 @@ function updateRow(it) {
   r.audio.classList.toggle('hidden', !ready);
   if (ready && r.dl.getAttribute('href') !== it.url) {
     r.dl.href = it.url;
-    r.dl.download = baseName(it.file.name) + '.wav';
+    r.dl.download = baseName(it.name) + '.wav';
     r.audio.src = it.url;
   }
   if (!ready && r.dl.hasAttribute('href')) {
@@ -592,7 +700,7 @@ async function makeZip(list, onProgress) {
 
 $('zip').onclick = async () => {
   // Cópia fixa: tirar um item da lista no meio não atrapalha o .zip.
-  const list = items.filter(i => i.status === 'pronto').map(i => ({ base: baseName(i.file.name), blob: i.blob }));
+  const list = items.filter(i => i.status === 'pronto').map(i => ({ base: baseName(i.name), blob: i.blob }));
   busy = true;
   note = 'Preparando o .zip…';
   refresh();
@@ -639,17 +747,25 @@ drop.onclick = () => picker.click();
 drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); picker.click(); } };
 picker.onchange = () => { addFiles([...picker.files]); picker.value = ''; };
 
-const hasFiles = e => [...((e.dataTransfer && e.dataTransfer.types) || [])].includes('Files');
+const linkBox = $('link');
+const addLinkFromBox = () => { if (linkBox.value.trim()) linkBox.value = addLinks(linkBox.value).join(' '); };
+$('addLink').onclick = addLinkFromBox;
+linkBox.onkeydown = e => { if (e.key === 'Enter') addLinkFromBox(); };
+
+// Arquivos ou links (arrastados de outra aba) podem ser soltos em qualquer lugar da página.
+const hasDrop = e => [...((e.dataTransfer && e.dataTransfer.types) || [])].some(t => t === 'Files' || t === 'text/uri-list');
 for (const type of ['dragenter', 'dragover']) window.addEventListener(type, e => {
-  if (!hasFiles(e)) return;
+  if (!hasDrop(e) || e.target === linkBox) return;
   e.preventDefault();
   drop.classList.add('over');
 });
 window.addEventListener('dragleave', e => { if (!e.relatedTarget) drop.classList.remove('over'); });
 window.addEventListener('drop', e => {
+  if (e.target === linkBox) return; // solto na caixa de link: o navegador só escreve o link nela
   e.preventDefault();
   drop.classList.remove('over');
   if (e.dataTransfer.files.length) addFiles([...e.dataTransfer.files]);
+  else if (e.dataTransfer.getData('text/uri-list')) addLinks(e.dataTransfer.getData('text/uri-list').split('\n').filter(l => !l.startsWith('#')).join(' '));
 });
 </script>
 </body>
