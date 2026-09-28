@@ -1241,13 +1241,13 @@ window.addEventListener('drop', e => {
 });
 
 /* ---------- remover fundo ---------- */
-// Usa a biblioteca aberta @imgly/background-removal (licença AGPL-3.0): um modelo de IA (IS-Net)
-// que roda no próprio navegador. A biblioteca e o modelo vêm da internet no primeiro uso.
-const BG_LIB = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm';
+// Usa o modelo de IA IS-Net publicado pela IMG.LY (licença AGPL-3.0), rodado pelo onnxruntime-web (MIT)
+// no próprio navegador. Os dois vêm da internet no primeiro uso e depois ficam guardados.
+const ORT = 'onnxruntime-web@1.17.3/dist/';
 const BG_DATA = 'https://staticimgly.com/@imgly/background-removal-data/1.4.5/dist/';
 const IMG_OPT_KEY = 'conversor.removerFundo';
 const imgItems = [];
-let imgBusy = false, imgNote = '', pasted = 0, bgLib = null;
+let imgBusy = false, imgNote = '', pasted = 0;
 const loadedModels = new Set();
 const nextPaint = () => new Promise(r => { requestAnimationFrame(() => setTimeout(r, 0)); setTimeout(r, 100); });
 
@@ -1264,7 +1264,7 @@ for (const id of ['imgModel', 'imgBg', 'imgColor']) $(id).addEventListener('inpu
 // Guarda o modelo no cache do navegador, para não baixar tudo de novo a cada visita.
 const plainFetch = window.fetch.bind(window);
 window.fetch = async (input, init) => {
-  const url = input instanceof Request ? input.url : String(input); // a biblioteca passa objetos URL
+  const url = input instanceof Request ? input.url : String(input);
   if (!url.startsWith(BG_DATA)) return plainFetch(input, init);
   let cache = null;
   try {
@@ -1277,19 +1277,58 @@ window.fetch = async (input, init) => {
   return res;
 };
 
-function loadBgLib() {
-  bgLib = bgLib || import(BG_LIB).catch(e => {
-    console.error(e);
-    bgLib = null;
-    throw userError('Não consegui carregar a ferramenta de IA. Confira a internet e tente de novo.');
-  });
-  return bgLib;
+const bgSessions = {};
+const modelError = () => userError('Não consegui baixar o modelo de IA. Confira a internet e tente de novo. Se a página estiver aberta dentro de outro aplicativo, abra no Chrome ou no Edge.');
+function bgSession(model, onBytes) { // carrega o motor e o modelo uma vez só
+  bgSessions[model] = bgSessions[model] || (async () => {
+    await loadScript(ORT + 'ort.wasm.min.js');
+    Object.assign(ort.env.wasm, { numThreads: 1, proxy: false, wasmPaths: CDN + ORT }); // página aberta do computador não tem várias threads
+    const index = await fetch(BG_DATA + 'resources.json').then(r => r.json()).catch(() => { throw modelError(); });
+    const entry = index['/models/' + model];
+    let got = 0;
+    const parts = await Promise.all(entry.chunks.map(async chunk => {
+      const res = await fetch(BG_DATA + chunk.hash).catch(() => { throw modelError(); });
+      if (!res.ok) throw modelError();
+      const part = await res.blob();
+      onBytes(got += part.size, entry.size);
+      return part;
+    }));
+    return ort.InferenceSession.create(await new Blob(parts).arrayBuffer(), { executionProviders: ['wasm'], graphOptimizationLevel: 'all', executionMode: 'parallel', enableCpuMemArena: true });
+  })().catch(e => { delete bgSessions[model]; throw e; });
+  return bgSessions[model];
+}
+
+// A IA olha a imagem em 1024×1024 e devolve, para cada ponto, o quanto ele é "objeto" (1) ou "fundo" (0).
+// Essa máscara volta ao tamanho original e vira a transparência da imagem.
+async function removeBg(file, model, onBytes) {
+  const session = await bgSession(model, onBytes);
+  const img = await imageToCanvas(file, () => {}), w = img.width, h = img.height, S = 1024, N = S * S;
+  const small = Object.assign(document.createElement('canvas'), { width: S, height: S }), sg = small.getContext('2d');
+  sg.drawImage(img, 0, 0, S, S);
+  const px = sg.getImageData(0, 0, S, S).data, input = new Float32Array(3 * N);
+  for (let i = 0, j = 0; j < N; i += 4, j++) {
+    input[j] = (px[i] - 128) / 256;
+    input[j + N] = (px[i + 1] - 128) / 256;
+    input[j + 2 * N] = (px[i + 2] - 128) / 256;
+  }
+  const { output } = await session.run({ input: new ort.Tensor('float32', input, [1, 3, S, S]) });
+  const mask = sg.createImageData(S, S);
+  for (let j = 0; j < N; j++) mask.data[j * 4 + 3] = output.data[j] * 255;
+  sg.clearRect(0, 0, S, S);
+  sg.putImageData(mask, 0, 0);
+  const big = Object.assign(document.createElement('canvas'), { width: w, height: h }), bg = big.getContext('2d');
+  bg.imageSmoothingQuality = 'high';
+  bg.drawImage(small, 0, 0, w, h);
+  const alpha = bg.getImageData(0, 0, w, h).data, ctx = img.getContext('2d'), full = ctx.getImageData(0, 0, w, h);
+  for (let i = 3; i < full.data.length; i += 4) full.data[i] = full.data[i] * alpha[i] / 255;
+  ctx.putImageData(full, 0, 0);
+  return canvasBlob(img, 'image/png');
 }
 
 function addImages(files) {
   const ignored = [];
   for (let file of files) {
-    if (!/^image\//.test(file.type)) { ignored.push(file.name); continue; }
+    if (!isImage(file)) { ignored.push(file.name); continue; }
     if (file.name === 'image.png') file = new File([file], `imagem colada ${++pasted}.png`, { type: file.type }); // print colado
     const it = { id: nextId++, name: file.name, file, status: 'fila', progress: 0 };
     imgItems.push(it);
@@ -1314,26 +1353,18 @@ async function processImages() {
 }
 
 async function processImage(it) {
-  const model = $('imgModel').value, fetched = {};
+  const model = $('imgModel').value;
   let shown = 0;
   const ready = loadedModels.has(model);
   Object.assign(it, { status: 'processando', phase: ready ? 'Removendo o fundo…' : 'Carregando a ferramenta de IA…', progress: 0, error: '' });
   updateImgRow(it);
   await nextPaint(); // a IA trava a página por alguns segundos: mostra o aviso antes
   try {
-    const { removeBackground } = await loadBgLib();
-    const blob = await removeBackground(it.file, {
-      model, publicPath: BG_DATA,
-      proxyToWorker: false, // o "worker" da biblioteca não abre quando ela vem de uma CDN
-      progress: (key, current, total) => {
-        if (!key.startsWith('fetch:')) return;
-        fetched[key] = [current, total];
-        const [got, all] = Object.values(fetched).reduce(([a, b], [c, t]) => [a + c, b + t], [0, 0]);
-        Object.assign(it, got < all
-          ? { phase: `Baixando o modelo de IA (só na primeira vez)… ${fmtSize(got)}`, progress: got / all }
-          : { phase: 'Removendo o fundo…', progress: 0 });
-        if (Date.now() - shown > 150 || got >= all) { shown = Date.now(); updateImgRow(it); }
-      }
+    const blob = await removeBg(it.file, model, (got, all) => {
+      Object.assign(it, got < all
+        ? { phase: `Baixando o modelo de IA (só na primeira vez)… ${fmtSize(got)} de ${fmtSize(all)}`, progress: got / all }
+        : { phase: 'Removendo o fundo…', progress: 0 });
+      if (Date.now() - shown > 150 || got >= all) { shown = Date.now(); updateImgRow(it); }
     });
     loadedModels.add(model);
     clearImgOutput(it);
