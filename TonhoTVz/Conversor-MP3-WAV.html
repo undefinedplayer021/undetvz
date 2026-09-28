@@ -1277,12 +1277,53 @@ window.fetch = async (input, init) => {
   return res;
 };
 
-const bgSessions = {};
+// A IA roda num "worker" (em paralelo) para a página continuar rolando e respondendo enquanto ela calcula.
+const BG_WORKER = `
+const sessions = {};
+self.onmessage = async ({ data: { id, type, payload } }) => {
+  try {
+    if (type === 'load') {
+      if (!self.ort) importScripts(payload.ortUrl + 'ort.wasm.min.js');
+      Object.assign(ort.env.wasm, { numThreads: 1, proxy: false, wasmPaths: payload.ortUrl });
+      sessions[payload.model] = await ort.InferenceSession.create(payload.bytes,
+        { executionProviders: ['wasm'], graphOptimizationLevel: 'all', executionMode: 'parallel', enableCpuMemArena: true });
+      return self.postMessage({ id, ok: true });
+    }
+    const { output } = await sessions[payload.model].run({ input: new ort.Tensor('float32', payload.input, [1, 3, 1024, 1024]) });
+    const mask = new Float32Array(output.data);
+    self.postMessage({ id, ok: true, mask }, [mask.buffer]);
+  } catch (e) {
+    self.postMessage({ id, ok: false, error: String((e && e.message) || e) });
+  }
+};`;
+let bgWorker = null, bgSeq = 0;
+const bgJobs = new Map(), bgSessions = {};
+function bgCall(type, payload, transfer = []) {
+  if (!bgWorker) {
+    bgWorker = new Worker(URL.createObjectURL(new Blob([BG_WORKER], { type: 'text/javascript' })));
+    bgWorker.onmessage = ({ data }) => {
+      const job = bgJobs.get(data.id);
+      if (!job) return;
+      bgJobs.delete(data.id);
+      if (data.ok) job.ok(data); else job.fail(new Error(data.error));
+    };
+    bgWorker.onerror = e => { // o worker caiu: na próxima imagem começa tudo de novo
+      for (const job of bgJobs.values()) job.fail(new Error(e.message || 'A IA parou de responder.'));
+      bgJobs.clear();
+      bgWorker.terminate();
+      bgWorker = null;
+      for (const k in bgSessions) delete bgSessions[k];
+    };
+  }
+  return new Promise((ok, fail) => {
+    const id = ++bgSeq;
+    bgJobs.set(id, { ok, fail });
+    bgWorker.postMessage({ id, type, payload }, transfer);
+  });
+}
 const modelError = () => userError('Não consegui baixar o modelo de IA. Confira a internet e tente de novo. Se a página estiver aberta dentro de outro aplicativo, abra no Chrome ou no Edge.');
-function bgSession(model, onBytes) { // carrega o motor e o modelo uma vez só
+function bgSession(model, onBytes) { // baixa o modelo (com cache) e prepara a IA uma vez só
   bgSessions[model] = bgSessions[model] || (async () => {
-    await loadScript(ORT + 'ort.wasm.min.js');
-    Object.assign(ort.env.wasm, { numThreads: 1, proxy: false, wasmPaths: CDN + ORT }); // página aberta do computador não tem várias threads
     const index = await fetch(BG_DATA + 'resources.json').then(r => r.json()).catch(() => { throw modelError(); });
     const entry = index['/models/' + model];
     let got = 0;
@@ -1293,7 +1334,11 @@ function bgSession(model, onBytes) { // carrega o motor e o modelo uma vez só
       onBytes(got += part.size, entry.size);
       return part;
     }));
-    return ort.InferenceSession.create(await new Blob(parts).arrayBuffer(), { executionProviders: ['wasm'], graphOptimizationLevel: 'all', executionMode: 'parallel', enableCpuMemArena: true });
+    const bytes = await new Blob(parts).arrayBuffer();
+    await bgCall('load', { model, bytes, ortUrl: CDN + ORT }, [bytes]).catch(e => {
+      console.error(e);
+      throw /importScripts|NetworkError|fetch/i.test(e.message) ? modelError() : e;
+    });
   })().catch(e => { delete bgSessions[model]; throw e; });
   return bgSessions[model];
 }
@@ -1301,7 +1346,7 @@ function bgSession(model, onBytes) { // carrega o motor e o modelo uma vez só
 // A IA olha a imagem em 1024×1024 e devolve, para cada ponto, o quanto ele é "objeto" (1) ou "fundo" (0).
 // Essa máscara volta ao tamanho original e vira a transparência da imagem.
 async function removeBg(file, model, onBytes) {
-  const session = await bgSession(model, onBytes);
+  await bgSession(model, onBytes);
   const img = await imageToCanvas(file, () => {}), w = img.width, h = img.height, S = 1024, N = S * S;
   const small = Object.assign(document.createElement('canvas'), { width: S, height: S }), sg = small.getContext('2d');
   sg.drawImage(img, 0, 0, S, S);
@@ -1311,9 +1356,9 @@ async function removeBg(file, model, onBytes) {
     input[j + N] = (px[i + 1] - 128) / 256;
     input[j + 2 * N] = (px[i + 2] - 128) / 256;
   }
-  const { output } = await session.run({ input: new ort.Tensor('float32', input, [1, 3, S, S]) });
+  const { mask: out } = await bgCall('run', { model, input }, [input.buffer]);
   const mask = sg.createImageData(S, S);
-  for (let j = 0; j < N; j++) mask.data[j * 4 + 3] = output.data[j] * 255;
+  for (let j = 0; j < N; j++) mask.data[j * 4 + 3] = out[j] * 255;
   sg.clearRect(0, 0, S, S);
   sg.putImageData(mask, 0, 0);
   const big = Object.assign(document.createElement('canvas'), { width: w, height: h }), bg = big.getContext('2d');
@@ -1358,7 +1403,6 @@ async function processImage(it) {
   const ready = loadedModels.has(model);
   Object.assign(it, { status: 'processando', phase: ready ? 'Removendo o fundo…' : 'Carregando a ferramenta de IA…', progress: 0, error: '' });
   updateImgRow(it);
-  await nextPaint(); // a IA trava a página por alguns segundos: mostra o aviso antes
   try {
     const blob = await removeBg(it.file, model, (got, all) => {
       Object.assign(it, got < all
